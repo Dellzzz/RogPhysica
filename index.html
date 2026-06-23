@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-    <title>Entropia Zero - PlataPhysica</title>
+    <title>Entropia Zero - Dano Crítico</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
@@ -14,14 +14,6 @@
             --hp1:#37e08a;--hp2:#15d6c0;--xp1:#39d5ff;--xp2:#a45cff;
             --txt:#eaf6ff;
         }
-	const records = {
-    	  level: Number(localStorage.getItem("ez_record_level")) || 0,
-  	  xp: Number(localStorage.getItem("ez_record_xp")) || 0,
-   	  time: Number(localStorage.getItem("ez_record_time")) || 0
-	};	
-
-	let gameStartTime = Date.now();
-
         *{margin:0;padding:0;box-sizing:border-box;user-select:none;-webkit-tap-highlight-color:transparent}
         html,body{overflow:hidden;width:100%;height:100%;background:var(--bg);font-family:'Rajdhani',system-ui,sans-serif;touch-action:none}
         canvas{display:block;width:100%;height:100%}
@@ -207,7 +199,7 @@
     </div>
 
     <div class="screen" id="startMenu">
-        <div class="brand">ENTROPIA ZERO<span class="sub">PlataPhysica</span></div>
+        <div class="brand">ENTROPIA ZERO<span class="sub">DANO CRÍTICO</span></div>
         <div class="menuBtns">
             <button class="menuBtn primary" id="btnStart">
                 <svg class="mIco" viewBox="0 0 24 24" fill="none"><path d="M8 5v14l11-7L8 5Z" fill="#071018"/></svg>
@@ -225,9 +217,6 @@
                 <svg class="mIco" viewBox="0 0 24 24" fill="none"><path d="M11 6l-6 6 6 6M5 12h14" stroke="#bcd6e6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 Voltar para plataforma
             </button>
-	<div class="credits">
-        	Jogo desenvolvido pelo Prof. Jardel A. Leite
-   	</div>
         </div>
     </div>
 
@@ -265,15 +254,23 @@ const c = document.getElementById("cv"),
       wepFar = document.getElementById("wepFar"),
       wepPri = document.getElementById("wepPri");
 
+// DPR limitado (telas 3x desenham ate 9x mais pixels) e zoom de camera (mais campo de visao).
+let DPR = 1, zoom = 1, viewW = innerWidth, viewH = innerHeight;
 function rs() {
-    c.width = innerWidth * devicePixelRatio;
-    c.height = innerHeight * devicePixelRatio;
+    DPR = Math.min(devicePixelRatio || 1, 2);          // teto no custo de preenchimento
+    let portrait = innerHeight >= innerWidth;
+    zoom = portrait ? 0.70 : 1.0;                       // em pe: afasta a camera, mostra mais
+    viewW = innerWidth / zoom;
+    viewH = innerHeight / zoom;
+    c.width = Math.round(innerWidth * DPR);
+    c.height = Math.round(innerHeight * DPR);
     c.style.width = innerWidth + "px";
     c.style.height = innerHeight + "px";
-    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
 rs();
 addEventListener("resize", rs);
+addEventListener("orientationchange", rs);
 
 const world = {w:8000, h:8000, f:.1}, cam = {x:0, y:0, s:.12};
 let paused = true;          // comeca pausado, no menu inicial
@@ -283,20 +280,20 @@ let gameStarted = false;
 const PLATAFORMA_URL = "index.html";
 
 const p = {x:4000, y:4000, vx:0, vy:0, r:15, spd:.175, hp:100, maxHp:100, lv:1, xp:0, next:18, pickup:25, orbXp:5, orbSpeed:.02, extraOrbs:0, lastAngle: 0, dmgMult: 1.0, xpMult: 1.0, critChance: 0.0, dead: false};
-cam.x = p.x - innerWidth / 2;   // ja centraliza no jogador para o fundo do menu
-cam.y = p.y - innerHeight / 2;
+cam.x = p.x - viewW / 2;   // ja centraliza no jogador para o fundo do menu
+cam.y = p.y - viewH / 2;
 
 let playerColor = "#ffffff";
 let selectedChar = 0;
 let chestsOpened = 0;
 
-// Personagens (cor + um bonus passivo leve). Tema de fisica.
+// Personagens: cor + bonus passivo + habilidade inicial unica. Tema de fisica.
 const CHARS = [
-    { name: "Padrão",  color: "#ffffff", desc: "Equilibrado, sem bônus.",          apply: () => {} },
-    { name: "Tesla",   color: "#39d5ff", desc: "+10% de chance de crítico.",        apply: () => { p.critChance += 0.10; } },
-    { name: "Newton",  color: "#b07cff", desc: "+40 de vida máxima.",               apply: () => { p.maxHp += 40; p.hp = p.maxHp; } },
-    { name: "Curie",   color: "#7cff5b", desc: "+15% de XP ganho.",                 apply: () => { p.xpMult += 0.15; } },
-    { name: "Joule",   color: "#ffb347", desc: "+10% de dano.",                     apply: () => { p.dmgMult += 0.10; } }
+    { name: "Padrão",  color: "#ffffff", desc: "Equilibrado, sem habilidade.",                         ability: "none",   apply: () => {} },
+    { name: "Tesla",   color: "#39d5ff", desc: "Raio amarelo que ricocheteia entre inimigos. +10% crítico.", ability: "tesla",  apply: () => { p.critChance += 0.10; } },
+    { name: "Newton",  color: "#b07cff", desc: "Maçãs sequenciadas. +40 de vida máxima.",                ability: "newton", apply: () => { p.maxHp += 40; p.hp = p.maxHp; } },
+    { name: "Curie",   color: "#7cff5b", desc: "Poções radioativas com dano contínuo. +15% de XP.",       ability: "curie",  apply: () => { p.xpMult += 0.15; } },
+    { name: "Joule",   color: "#ffb347", desc: "Aura de calor com dano contínuo. +10% de dano.",          ability: "joule",  apply: () => { p.dmgMult += 0.10; } }
 ];
 
 // Colecionaveis: conquistas com curiosidades de fisica, salvas entre partidas.
@@ -408,6 +405,123 @@ function sndGrav()   { beep(520, 0.30, "sawtooth", 0.22, 60); }
 function sndFaraday(){ notesAt([[1300,0,0.05],[1000,0.05,0.05],[1500,0.10,0.06]], "square", 0.15); }
 function sndPrism()  { beep(1500, 0.22, "sawtooth", 0.16, 280); }
 function sndOver()   { notesAt([[440,0,0.22],[349,0.20,0.22],[262,0.42,0.45]], "sawtooth", 0.24); }
+function sndTesla()  { beep(900, 0.08, "square", 0.12, 1700); }
+function sndCurie()  { beep(300, 0.16, "sine",   0.12, 150); }
+
+/* ===================== HABILIDADES DE PERSONAGEM ===================== */
+let charAbility = "none";        // definido em startGame conforme o personagem
+let abilityLast = -99999;        // ultimo disparo (tesla / newton / curie)
+let jouleTickT = 0;              // acumulador de tempo da aura do Joule
+const chainFx = { pts: [], life: 0 };   // efeito visual do raio do Tesla
+const appleSeq = [];             // fila de tempos para soltar macas (Newton)
+const potions = [];              // projeteis de pocao (Curie)
+const acidZones = [];            // pocas radioativas que causam dano continuo (Curie)
+
+// --- Tesla: raio que ricocheteia ---
+function fireTesla(now) {
+    let used = new Set(), nodes = [];
+    let cx = p.x, cy = p.y;
+    for (let jump = 0; jump < 5; jump++) {
+        let best = -1, bestD = Infinity;
+        let range = (jump === 0 ? 600 : 240), range2 = range * range;
+        for (let i = 0; i < enemies.length; i++) {
+            if (used.has(i)) continue;
+            let e = enemies[i], dx = e.x - cx, dy = e.y - cy, d2 = dx*dx + dy*dy;
+            if (d2 < bestD && d2 <= range2) { bestD = d2; best = i; }
+        }
+        if (best < 0) break;
+        used.add(best);
+        let e = enemies[best];
+        nodes.push({ x: e.x, y: e.y });
+        applyDamage(e, 18);
+        cx = e.x; cy = e.y;
+    }
+    for (let i = enemies.length - 1; i >= 0; i--) if (enemies[i].hp <= 0) killEnemy(enemies[i], i);
+    if (nodes.length) { chainFx.pts = [{ x: p.x, y: p.y }].concat(nodes); chainFx.life = 220; sndTesla(); }
+}
+
+// --- Newton: macas em sequencia (reaproveita o projetil de maca existente) ---
+function launchApple() {
+    let closest = null, minD2 = Infinity;
+    for (let i = 0; i < enemies.length; i++) {
+        let e = enemies[i], dx = e.x - p.x, dy = e.y - p.y, d2 = dx*dx + dy*dy;
+        if (d2 < minD2) { minD2 = d2; closest = e; }
+    }
+    let ang = closest ? Math.atan2(closest.y - p.y, closest.x - p.x) : p.lastAngle;
+    apples.push({ x: p.x, y: p.y, vx: Math.cos(ang)*7, vy: Math.sin(ang)*7, r: 6, bounces: 0, maxBounces: 3 });
+}
+function releaseApples(now) {
+    while (appleSeq.length && now >= appleSeq[0]) { appleSeq.shift(); launchApple(); }
+}
+
+// --- Curie: pocoes radioativas (DoT em area) ---
+function fireCurie() {
+    let tx = p.x, ty = p.y, found = false, bestD = Infinity;
+    for (let i = 0; i < enemies.length; i++) {
+        let e = enemies[i], dx = e.x - p.x, dy = e.y - p.y, d2 = dx*dx + dy*dy;
+        if (d2 < bestD) { bestD = d2; tx = e.x; ty = e.y; found = true; }
+    }
+    let ang = found ? Math.atan2(ty - p.y, tx - p.x) : Math.random() * 6.28;
+    potions.push({ x: p.x, y: p.y, vx: Math.cos(ang)*6, vy: Math.sin(ang)*6, dist: 0, max: found ? Math.min(Math.sqrt(bestD), 520) : 300 });
+    sndCurie();
+}
+function updatePotions() {
+    for (let i = potions.length - 1; i >= 0; i--) {
+        let po = potions[i];
+        po.x += po.vx; po.y += po.vy; po.dist += 6;
+        let hit = false;
+        for (let j = 0; j < enemies.length; j++) {
+            let e = enemies[j], dx = e.x - po.x, dy = e.y - po.y, rr = e.r + 8;
+            if (dx*dx + dy*dy < rr*rr) { hit = true; break; }
+        }
+        if (hit || po.dist >= po.max) {
+            acidZones.push({ x: po.x, y: po.y, r: 95, until: performance.now() + 4500, nextTick: 0 });
+            potions.splice(i, 1);
+        }
+    }
+}
+function updateAcidZones(now) {
+    for (let i = acidZones.length - 1; i >= 0; i--) {
+        let z = acidZones[i];
+        if (now >= z.until) { acidZones.splice(i, 1); continue; }
+        if (now >= z.nextTick) {
+            z.nextTick = now + 500;
+            let r2 = z.r * z.r;
+            for (let j = enemies.length - 1; j >= 0; j--) {
+                let e = enemies[j], dx = e.x - z.x, dy = e.y - z.y;
+                if (dx*dx + dy*dy <= r2) { applyDamage(e, 7); if (e.hp <= 0) killEnemy(e, j); }
+            }
+        }
+    }
+}
+
+// --- Joule: aura de calor (DoT ao redor do jogador) ---
+const JOULE_R = 135;
+function jouleAura() {
+    let r2 = JOULE_R * JOULE_R;
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let e = enemies[i], dx = e.x - p.x, dy = e.y - p.y;
+        if (dx*dx + dy*dy <= r2) { applyDamage(e, 9); if (e.hp <= 0) killEnemy(e, i); }
+    }
+}
+
+// Atualiza a habilidade do personagem ativo
+function updateAbilities(now, dt) {
+    if (charAbility === "tesla") {
+        if (enemies.length && now - abilityLast >= 2500) { abilityLast = now; fireTesla(now); }
+        if (chainFx.life > 0) chainFx.life -= dt;
+    } else if (charAbility === "newton") {
+        if (enemies.length && now - abilityLast >= 3500) { abilityLast = now; for (let k = 0; k < 4; k++) appleSeq.push(now + k * 130); }
+        releaseApples(now);
+    } else if (charAbility === "curie") {
+        if (enemies.length && now - abilityLast >= 3200) { abilityLast = now; fireCurie(); }
+    } else if (charAbility === "joule") {
+        jouleTickT += dt;
+        if (jouleTickT >= 450) { jouleTickT = 0; jouleAura(); }
+    }
+    if (charAbility === "curie") { updatePotions(); updateAcidZones(now); }
+}
+
 
 
 let lastAppleTime = 0;
@@ -431,7 +545,7 @@ for(let i=0; i<25; i++) spawnEnemy();
 
 // Gera uma posicao em um anel logo fora da tela, ao redor do jogador (presos ao mundo).
 function spawnPos() {
-    let screenR = Math.hypot(innerWidth, innerHeight) / 2;
+    let screenR = Math.hypot(viewW, viewH) / 2;
     let dist = screenR + 80 + Math.random() * 260;
     let ang = Math.random() * Math.PI * 2;
     let x = p.x + Math.cos(ang) * dist;
@@ -741,8 +855,8 @@ function upd() {
         let a = apples[i];
         a.x += a.vx; a.y += a.vy;
 
-        let minX = cam.x, maxX = cam.x + innerWidth;
-        let minY = cam.y, maxY = cam.y + innerHeight;
+        let minX = cam.x, maxX = cam.x + viewW;
+        let minY = cam.y, maxY = cam.y + viewH;
         let bounced = false;
 
         if(a.x - a.r < minX) { a.x = minX + a.r; a.vx *= -1; bounced = true; }
@@ -766,6 +880,8 @@ function upd() {
             }
         }
     }
+
+    updateAbilities(now, dt);   // habilidade do personagem (Tesla / Newton / Curie / Joule)
 
     // ===================== Gaiola de Faraday =====================
     let fLv = upLevels["Gaiola de Faraday"];
@@ -868,9 +984,10 @@ function upd() {
                     if (j <= i) continue;          // cada par e tratado uma unica vez
                     let e2 = enemies[j];
                     let dx = e2.x - e1.x, dy = e2.y - e1.y;
-                    let dist = Math.hypot(dx, dy);
+                    let d2 = dx*dx + dy*dy;
                     let minDist = e1.r + e2.r;
-                    if(dist < minDist && dist > 0) {
+                    if(d2 < minDist*minDist && d2 > 0) {       // raiz so quando ha sobreposicao
+                        let dist = Math.sqrt(d2);
                         let overlap = minDist - dist;
                         let nx = dx / dist, ny = dy / dist;
                         e1.x -= nx * overlap * 0.5;
@@ -934,32 +1051,34 @@ function upd() {
 
     if (hurtFlash > 0.001) hurtFlash *= 0.9; else hurtFlash = 0;  // decai o flash vermelho
     
-    cam.x += (p.x - innerWidth/2 - cam.x) * cam.s;
-    cam.y += (p.y - innerHeight/2 - cam.y) * cam.s;
+    cam.x += (p.x - viewW/2 - cam.x) * cam.s;
+    cam.y += (p.y - viewH/2 - cam.y) * cam.s;
     
-    let mins = Math.floor(elapsedTime / 60000);
-    let secs = Math.floor((elapsedTime % 60000) / 1000);
-    let timeStr = `${mins}:${secs.toString().padStart(2, "0")}`;
+    // ===================== Atualiza HUD (a cada 2 frames: metade do custo de DOM) =====================
+    hudTick++;
+    if (hudTick % 2 === 0) {
+        let mins = Math.floor(elapsedTime / 60000);
+        let secs = Math.floor((elapsedTime % 60000) / 1000);
+        elKill.textContent = kills;
+        elTimer.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
+        elLv.textContent = p.lv;
 
-    // ===================== Atualiza HUD =====================
-    elKill.textContent = kills;
-    elTimer.textContent = timeStr;
-    elLv.textContent = p.lv;
+        let hpPct = Math.max(0, p.hp / p.maxHp);
+        elHpFill.style.transform = `scaleX(${hpPct})`;
+        elHpFill.classList.toggle("low", hpPct < 0.25);
+        elHpText.textContent = `${Math.max(0, Math.floor(p.hp))}/${p.maxHp}`;
 
-    let hpPct = Math.max(0, p.hp / p.maxHp);
-    elHpFill.style.transform = `scaleX(${hpPct})`;
-    elHpFill.classList.toggle("low", hpPct < 0.25);
-    elHpText.textContent = `${Math.max(0, Math.floor(p.hp))}/${p.maxHp}`;
+        let xpPct = Math.max(0, Math.min(1, p.xp / p.next));
+        elXpFill.style.transform = `scaleX(${xpPct})`;
+        elXpText.textContent = `${Math.floor(p.xp)}/${p.next}`;
 
-    let xpPct = Math.max(0, Math.min(1, p.xp / p.next));
-    elXpFill.style.transform = `scaleX(${xpPct})`;
-    elXpText.textContent = `${Math.floor(p.xp)}/${p.next}`;
-
-    updateWep(wepFar, upLevels["Gaiola de Faraday"], faraday.last, FARADAY_CD, now, faraday.active);
-    updateWep(wepPri, upLevels["Prisma de Luz"], prism.last, PRISM_CD, now, prism.active);
+        updateWep(wepFar, upLevels["Gaiola de Faraday"], faraday.last, FARADAY_CD, now, faraday.active);
+        updateWep(wepPri, upLevels["Prisma de Luz"], prism.last, PRISM_CD, now, prism.active);
+    }
 
     checkCollectibles();
 }
+let hudTick = 0;
 
 // Atualiza o indicador de recarga de uma arma automatica
 function updateWep(el, lv, last, cdArr, now, active) {
@@ -1002,23 +1121,53 @@ function drawPrism(x, y, alpha) {
 }
 
 function draw() {
+    let tnow = performance.now();
+
+    // limpa em espaco de tela (sem zoom)
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.fillStyle = "#071018";
-    ctx.fillRect(0,0,innerWidth,innerHeight);
-    ctx.save();
+    ctx.fillRect(0, 0, innerWidth, innerHeight);
+
+    // mundo: aplica zoom e centraliza no jogador
+    ctx.setTransform(DPR * zoom, 0, 0, DPR * zoom, 0, 0);
     ctx.translate(-cam.x, -cam.y);
+
+    // retangulo visivel do mundo (para descartar o que esta fora da tela)
+    let vx0 = cam.x, vy0 = cam.y, vx1 = cam.x + viewW, vy1 = cam.y + viewH;
+
+    // Grade: apenas as linhas visiveis (antes desenhava o mundo 8000x8000 inteiro a cada frame)
     ctx.strokeStyle = "#39d5ff12";
-    
-    for(let i=0; i<world.w; i+=100){ ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,world.h); ctx.stroke(); }
-    for(let i=0; i<world.h; i+=100){ ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(world.w,i); ctx.stroke(); }
+    ctx.lineWidth = 1;
+    let gLoX = Math.max(0, Math.floor(vx0/100)*100), gHiX = Math.min(world.w, vx1);
+    let gLoY = Math.max(0, Math.floor(vy0/100)*100), gHiY = Math.min(world.h, vy1);
+    let gTop = Math.max(0, vy0), gBot = Math.min(world.h, vy1);
+    let gLeft = Math.max(0, vx0), gRight = Math.min(world.w, vx1);
+    for(let i=gLoX; i<=gHiX; i+=100){ ctx.beginPath(); ctx.moveTo(i, gTop); ctx.lineTo(i, gBot); ctx.stroke(); }
+    for(let i=gLoY; i<=gHiY; i+=100){ ctx.beginPath(); ctx.moveTo(gLeft, i); ctx.lineTo(gRight, i); ctx.stroke(); }
     
     let near = p.x < 150 || p.y < 150 || p.x > world.w - 150 || p.y > world.h - 150;
     ctx.lineWidth = 20;
     ctx.strokeStyle = near ? "rgba(255,0,0,.8)" : "rgba(57,213,255,.25)";
     ctx.strokeRect(0, 0, world.w, world.h);
+
+    // Pocas radioativas da Curie (sob os inimigos)
+    if (acidZones.length) {
+        let pn = performance.now();
+        acidZones.forEach(z => {
+            if (z.x<vx0-z.r||z.x>vx1+z.r||z.y<vy0-z.r||z.y>vy1+z.r) return;
+            let pulse = 0.5 + 0.5 * Math.sin(pn / 180 + z.x);
+            ctx.fillStyle = "rgba(124,255,91," + (0.12 + 0.06 * pulse).toFixed(3) + ")";
+            ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, 6.28); ctx.fill();
+            ctx.strokeStyle = "rgba(150,255,120," + (0.4 + 0.2 * pulse).toFixed(3) + ")";
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(z.x, z.y, z.r * (0.6 + 0.18 * pulse), 0, 6.28); ctx.stroke();
+        });
+    }
     
-    drops.forEach(o=>{ ctx.fillStyle = "#7cff5b"; ctx.beginPath(); ctx.arc(o.x, o.y, 5, 0, 6.28); ctx.fill(); });
+    drops.forEach(o=>{ if(o.x<vx0-20||o.x>vx1+20||o.y<vy0-20||o.y>vy1+20) return; ctx.fillStyle = "#7cff5b"; ctx.beginPath(); ctx.arc(o.x, o.y, 5, 0, 6.28); ctx.fill(); });
     
     chests.forEach(c=>{
+        if(c.x<vx0-40||c.x>vx1+40||c.y<vy0-40||c.y>vy1+40) return;
         ctx.fillStyle = "#f1c40f"; 
         ctx.fillRect(c.x - c.r, c.y - c.r * 0.75, c.r * 2, c.r * 1.5);
         ctx.fillStyle = "#fff"; 
@@ -1026,11 +1175,10 @@ function draw() {
     });
     
     enemies.forEach(e=>{
-        let isSlowed = performance.now() < e.slowUntil;
-        ctx.fillStyle = isSlowed ? "#e0e0e0" : e.color;
-        
+        if(e.x<vx0-40||e.x>vx1+40||e.y<vy0-40||e.y>vy1+40) return;   // fora da tela: nao desenha
+        ctx.fillStyle = (tnow < e.slowUntil) ? "#e0e0e0" : e.color;
         ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 6.28); ctx.fill();
-        bar(e.x - e.r, e.y - e.r - 8, e.r * 2, 4, e.hp/e.maxHp, "#f55", "#400");
+        if (e.hp < e.maxHp) bar(e.x - e.r, e.y - e.r - 8, e.r * 2, 4, e.hp/e.maxHp, "#f55", "#400");  // barra so se ferido
     });
     
     orbs.forEach(o=>{
@@ -1040,6 +1188,35 @@ function draw() {
     });
 
     apples.forEach(a => { ctx.fillStyle = "#ff2e2e"; ctx.beginPath(); ctx.arc(a.x, a.y, a.r, 0, 6.28); ctx.fill(); });
+
+    // Pocoes da Curie (projeteis)
+    potions.forEach(po => {
+        ctx.fillStyle = "#7cff5b";
+        ctx.beginPath(); ctx.arc(po.x, po.y, 6, 0, 6.28); ctx.fill();
+        ctx.fillStyle = "rgba(124,255,91,.35)";
+        ctx.beginPath(); ctx.arc(po.x, po.y, 11, 0, 6.28); ctx.fill();
+    });
+
+    // Raio do Tesla (ricochete)
+    if (chainFx.life > 0 && chainFx.pts.length > 1) {
+        let a = Math.max(0, Math.min(1, chainFx.life / 220));
+        ctx.strokeStyle = "rgba(255,236,80," + a.toFixed(2) + ")";
+        ctx.lineWidth = 3;
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        ctx.moveTo(chainFx.pts[0].x, chainFx.pts[0].y);
+        for (let i = 1; i < chainFx.pts.length; i++) {
+            let x0 = chainFx.pts[i-1].x, y0 = chainFx.pts[i-1].y, x1 = chainFx.pts[i].x, y1 = chainFx.pts[i].y;
+            // pontos intermediarios deslocados, dando o aspecto irregular do raio
+            let mx = (x0+x1)/2 + (Math.random()-0.5)*22, my = (y0+y1)/2 + (Math.random()-0.5)*22;
+            ctx.lineTo(mx, my); ctx.lineTo(x1, y1);
+        }
+        ctx.stroke();
+        // nucleo branco
+        ctx.strokeStyle = "rgba(255,255,255," + (a*0.9).toFixed(2) + ")";
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+    }
 
     // ===== Gaiola de Faraday (anel eletrico) =====
     if (faraday.active) {
@@ -1115,6 +1292,21 @@ function draw() {
         visualGravRadius -= 8;
     }
 
+    // Aura de calor do Joule (ao redor do jogador)
+    if (charAbility === "joule") {
+        let pn = performance.now();
+        let pulse = 0.5 + 0.5 * Math.sin(pn / 150);
+        let grd = ctx.createRadialGradient(p.x, p.y, JOULE_R * 0.3, p.x, p.y, JOULE_R);
+        grd.addColorStop(0, "rgba(255,120,30,0)");
+        grd.addColorStop(0.7, "rgba(255,120,30," + (0.10 + 0.05 * pulse).toFixed(3) + ")");
+        grd.addColorStop(1, "rgba(255,80,20," + (0.20 + 0.08 * pulse).toFixed(3) + ")");
+        ctx.fillStyle = grd;
+        ctx.beginPath(); ctx.arc(p.x, p.y, JOULE_R, 0, 6.28); ctx.fill();
+        ctx.strokeStyle = "rgba(255,150,50," + (0.35 + 0.2 * pulse).toFixed(3) + ")";
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(p.x, p.y, JOULE_R, 0, 6.28); ctx.stroke();
+    }
+
     ctx.strokeStyle = "#39d5ff44";
     ctx.beginPath(); ctx.arc(p.x, p.y, p.pickup, 0, 6.28); ctx.stroke();
     
@@ -1138,10 +1330,11 @@ function draw() {
 
     bar(p.x-20, p.y-30, 40, 5, p.hp/p.maxHp, "#0f0", "#400");
     
-    // Desenha indicadores de dano (criticos maiores; opacidade segura ate o fim)
+    // Desenha indicadores de dano (fonte compensada pelo zoom para manter a leitura)
     ctx.textAlign = "center";
+    let fNorm = Math.round(16 / zoom), fCrit = Math.round(21 / zoom);
     dmgTexts.forEach(t => {
-        ctx.font = t.crit ? "bold 21px system-ui" : "bold 16px system-ui";
+        ctx.font = "bold " + (t.crit ? fCrit : fNorm) + "px system-ui";
         ctx.globalAlpha = Math.min(1, t.life * 2.8);
         ctx.lineWidth = 3;
         ctx.strokeStyle = "#000";
@@ -1151,7 +1344,8 @@ function draw() {
     });
     ctx.globalAlpha = 1.0;
     
-    ctx.restore();
+    // volta ao espaco de tela (sem zoom) para a vinheta
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
     // Flash vermelho ao tomar dano (vinheta em espaco de tela)
     if (hurtFlash > 0.01) {
@@ -1236,6 +1430,7 @@ function startGame() {
     unlockAudio();
     CHARS[selectedChar].apply();         // aplica o bonus do personagem
     playerColor = CHARS[selectedChar].color;
+    charAbility = CHARS[selectedChar].ability;   // habilidade inicial do personagem
     showScreen("none");
     document.body.classList.remove("menu-open");
     gameStarted = true;
