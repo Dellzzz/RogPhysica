@@ -381,7 +381,8 @@ const upLevels = {
     "Velocidade das orbes": 0,
     "Chance de crítico": 0,
     "Gaiola de Faraday": 0,
-    "Prisma de Luz": 0
+    "Prisma de Luz": 0,
+    "Habilidade": 0
 };
 
 // Tempos de recarga (ms) por nível 1..5
@@ -457,65 +458,110 @@ function sndOver()   { notesAt([[440,0,0.22],[349,0.20,0.22],[262,0.42,0.45]], "
 function sndWin()    { notesAt([[523,0,0.14],[659,0.13,0.14],[784,0.26,0.14],[1047,0.39,0.30],[1319,0.6,0.34]], "square", 0.22); }
 function sndTesla()  { beep(900, 0.08, "square", 0.12, 1700); }
 function sndCurie()  { beep(300, 0.16, "sine",   0.12, 150); }
+function sndExplode(){ beep(150, 0.18, "sawtooth", 0.16, 50); }
 
 /* ===================== HABILIDADES DE PERSONAGEM ===================== */
 let charAbility = "none";        // definido em startGame conforme o personagem
 let abilityLast = -99999;        // ultimo disparo (tesla / newton / curie)
+let newtonWhirlLast = -99999;    // ultimo turbilhao (Newton lv5)
 let jouleTickT = 0;              // acumulador de tempo da aura do Joule
-const chainFx = { pts: [], life: 0 };   // efeito visual do raio do Tesla
+const chainFx = { chains: [], life: 0 };  // efeito visual dos raios do Tesla (varios)
 const appleSeq = [];             // fila de tempos para soltar macas (Newton)
 const potions = [];              // projeteis de pocao (Curie)
-const acidZones = [];            // pocas radioativas que causam dano continuo (Curie)
+const acidZones = [];            // pocas radioativas (Curie)
+const explosions = [];           // explosoes (macas explosivas do Newton)
 
-// --- Tesla: raio que ricocheteia ---
-function fireTesla(now) {
-    let used = new Set(), nodes = [];
-    let cx = p.x, cy = p.y;
-    for (let jump = 0; jump < 5; jump++) {
-        let best = -1, bestD = Infinity;
-        let range = (jump === 0 ? 600 : 240), range2 = range * range;
-        for (let i = 0; i < enemies.length; i++) {
-            if (used.has(i)) continue;
-            let e = enemies[i], dx = e.x - cx, dy = e.y - cy, d2 = dx*dx + dy*dy;
-            if (d2 < bestD && d2 <= range2) { bestD = d2; best = i; }
-        }
-        if (best < 0) break;
-        used.add(best);
-        let e = enemies[best];
-        nodes.push({ x: e.x, y: e.y });
-        applyDamage(e, 18);
-        cx = e.x; cy = e.y;
-    }
-    for (let i = enemies.length - 1; i >= 0; i--) if (enemies[i].hp <= 0) killEnemy(enemies[i], i);
-    if (nodes.length) { chainFx.pts = [{ x: p.x, y: p.y }].concat(nodes); chainFx.life = 220; sndTesla(); }
+// Nivel atual da habilidade (1..5; 0 = personagem sem habilidade)
+function abLv() { return upLevels["Habilidade"]; }
+
+// Parametros por nivel de cada habilidade
+function teslaParams() { let lv = abLv(); return { chainLen: lv <= 3 ? lv + 1 : 4, bolts: lv <= 3 ? 1 : (lv - 2) }; }   // chain 2/3/4/4/4 ; raios 1/1/1/2/3
+function curieParams() { let lv = abLv(); return { zoneR: lv <= 3 ? (70 + lv * 17) : 121, count: lv <= 3 ? 1 : (lv - 2) }; } // raio cresce lv1-3 ; pocoes 1/1/1/2/3
+function newtonParams(){ let lv = abLv(); return { count: Math.min(2 + lv, 4), explode: lv >= 4 ? 0.5 : (lv === 3 ? 0.2 : 0) }; } // macas 3/4/4/4/4 ; explosao 0/0/20%/50%/50%
+function jouleParams() { let lv = abLv(); return { R: lv <= 3 ? (95 + lv * 22) : 161, dmg: lv >= 5 ? 18 : (lv === 4 ? 13 : 9) }; }  // raio cresce lv1-3 ; dano 9/9/9/13/18
+
+// Nome e descricao das melhorias da habilidade (para as cartas de upgrade)
+const ABILITY_NAME = { tesla: "Raio Tesla", curie: "Pocao da Curie", newton: "Macas de Newton", joule: "Aura Joule" };
+function abilityUpDesc(toLv) {
+    let m = {
+        tesla:  { 2: "ricocheteia em 3", 3: "ricocheteia em 4", 4: "+1 raio", 5: "+1 raio (3 no total)" },
+        curie:  { 2: "raio maior", 3: "raio ainda maior", 4: "+1 pocao", 5: "+1 pocao (3 no total)" },
+        newton: { 2: "+1 maca", 3: "macas explodem 20%", 4: "macas explodem 50%", 5: "turbilhao explosivo" },
+        joule:  { 2: "area maior", 3: "area ainda maior", 4: "+dano na area", 5: "+dano (maximo)" }
+    };
+    return (m[charAbility] && m[charAbility][toLv]) || "";
 }
 
-// --- Newton: macas em sequencia (reaproveita o projetil de maca existente) ---
-function launchApple() {
+// Explosao em area (maca explosiva)
+function explodeAt(x, y) {
+    let R = 78, r2 = R * R;
+    for (let j = enemies.length - 1; j >= 0; j--) {
+        let e = enemies[j], dx = e.x - x, dy = e.y - y;
+        if (dx*dx + dy*dy <= r2) { applyDamage(e, 30); if (e.hp <= 0) killEnemy(e, j); }
+    }
+    explosions.push({ x: x, y: y, r: R, life: 1 });
+    sndExplode();
+}
+
+// --- Tesla: raios que ricocheteiam (chainLen saltos, bolts raios) ---
+function fireTesla() {
+    let pr = teslaParams();
+    let used = new Set(), allChains = [];
+    for (let b = 0; b < pr.bolts; b++) {
+        let nodes = [], cx = p.x, cy = p.y;
+        for (let jump = 0; jump < pr.chainLen; jump++) {
+            let best = -1, bestD = Infinity;
+            let range = (jump === 0 ? 600 : 240), range2 = range * range;
+            for (let i = 0; i < enemies.length; i++) {
+                if (used.has(i)) continue;
+                let e = enemies[i], dx = e.x - cx, dy = e.y - cy, d2 = dx*dx + dy*dy;
+                if (d2 < bestD && d2 <= range2) { bestD = d2; best = i; }
+            }
+            if (best < 0) break;
+            used.add(best);
+            let e = enemies[best];
+            nodes.push({ x: e.x, y: e.y });
+            applyDamage(e, 18);
+            cx = e.x; cy = e.y;
+        }
+        if (nodes.length) allChains.push([{ x: p.x, y: p.y }].concat(nodes));
+    }
+    for (let i = enemies.length - 1; i >= 0; i--) if (enemies[i].hp <= 0) killEnemy(enemies[i], i);
+    if (allChains.length) { chainFx.chains = allChains; chainFx.life = 220; sndTesla(); }
+}
+
+// --- Newton: macas em sequencia (com chance de explodir) ---
+function launchApple(explode) {
     let closest = null, minD2 = Infinity;
     for (let i = 0; i < enemies.length; i++) {
         let e = enemies[i], dx = e.x - p.x, dy = e.y - p.y, d2 = dx*dx + dy*dy;
         if (d2 < minD2) { minD2 = d2; closest = e; }
     }
     let ang = closest ? Math.atan2(closest.y - p.y, closest.x - p.x) : p.lastAngle;
-    apples.push({ x: p.x, y: p.y, vx: Math.cos(ang)*7, vy: Math.sin(ang)*7, r: 6, bounces: 0, maxBounces: 3 });
+    apples.push({ x: p.x, y: p.y, vx: Math.cos(ang)*7, vy: Math.sin(ang)*7, r: 6, bounces: 0, maxBounces: 3, explode: !!explode });
 }
 function releaseApples(now) {
-    while (appleSeq.length && now >= appleSeq[0]) { appleSeq.shift(); launchApple(); }
+    let ex = newtonParams().explode;
+    while (appleSeq.length && now >= appleSeq[0]) { appleSeq.shift(); launchApple(Math.random() < ex); }
 }
 
 // --- Curie: pocoes radioativas (DoT em area) ---
 function fireCurie() {
+    let pr = curieParams();
     let tx = p.x, ty = p.y, found = false, bestD = Infinity;
     for (let i = 0; i < enemies.length; i++) {
         let e = enemies[i], dx = e.x - p.x, dy = e.y - p.y, d2 = dx*dx + dy*dy;
         if (d2 < bestD) { bestD = d2; tx = e.x; ty = e.y; found = true; }
     }
-    let ang = found ? Math.atan2(ty - p.y, tx - p.x) : Math.random() * 6.28;
-    potions.push({ x: p.x, y: p.y, vx: Math.cos(ang)*6, vy: Math.sin(ang)*6, dist: 0, max: found ? Math.min(Math.sqrt(bestD), 520) : 300 });
+    let base = found ? Math.atan2(ty - p.y, tx - p.x) : Math.random() * 6.28;
+    for (let k = 0; k < pr.count; k++) {
+        let spread = pr.count > 1 ? (k - (pr.count - 1) / 2) * 0.3 : 0;
+        let ang = base + spread;
+        potions.push({ x: p.x, y: p.y, vx: Math.cos(ang)*6, vy: Math.sin(ang)*6, dist: 0, max: found ? Math.min(Math.sqrt(bestD), 520) : 300, zoneR: pr.zoneR });
+    }
     sndCurie();
 }
-function updatePotions() {
+function updatePotions(now) {
     for (let i = potions.length - 1; i >= 0; i--) {
         let po = potions[i];
         po.x += po.vx; po.y += po.vy; po.dist += 6;
@@ -525,7 +571,7 @@ function updatePotions() {
             if (dx*dx + dy*dy < rr*rr) { hit = true; break; }
         }
         if (hit || po.dist >= po.max) {
-            acidZones.push({ x: po.x, y: po.y, r: 95, until: performance.now() + 4500, nextTick: 0 });
+            acidZones.push({ x: po.x, y: po.y, r: po.zoneR || 95, until: now + 4500, nextTick: 0 });
             potions.splice(i, 1);
         }
     }
@@ -546,30 +592,35 @@ function updateAcidZones(now) {
 }
 
 // --- Joule: aura de calor (DoT ao redor do jogador) ---
-const JOULE_R = 135;
 function jouleAura() {
-    let r2 = JOULE_R * JOULE_R;
+    let pr = jouleParams(), r2 = pr.R * pr.R;
     for (let i = enemies.length - 1; i >= 0; i--) {
         let e = enemies[i], dx = e.x - p.x, dy = e.y - p.y;
-        if (dx*dx + dy*dy <= r2) { applyDamage(e, 9); if (e.hp <= 0) killEnemy(e, i); }
+        if (dx*dx + dy*dy <= r2) { applyDamage(e, pr.dmg); if (e.hp <= 0) killEnemy(e, i); }
     }
 }
 
 // Atualiza a habilidade do personagem ativo
 function updateAbilities(now, dt) {
     if (charAbility === "tesla") {
-        if (enemies.length && now - abilityLast >= 2500) { abilityLast = now; fireTesla(now); }
+        if (enemies.length && now - abilityLast >= 2500) { abilityLast = now; fireTesla(); }
         if (chainFx.life > 0) chainFx.life -= dt;
     } else if (charAbility === "newton") {
-        if (enemies.length && now - abilityLast >= 3500) { abilityLast = now; for (let k = 0; k < 4; k++) appleSeq.push(now + k * 130); }
+        if (enemies.length && now - abilityLast >= 3500) { abilityLast = now; let n = newtonParams().count; for (let k = 0; k < n; k++) appleSeq.push(now + k * 130); }
         releaseApples(now);
+        if (abLv() >= 5 && enemies.length && now - newtonWhirlLast >= 30000) {   // turbilhao de macas explosivas
+            newtonWhirlLast = now;
+            for (let k = 0; k < 16; k++) { let ang = (k / 16) * Math.PI * 2; apples.push({ x: p.x, y: p.y, vx: Math.cos(ang)*6, vy: Math.sin(ang)*6, r: 7, bounces: 0, maxBounces: 3, explode: true }); }
+            sndExplode();
+        }
     } else if (charAbility === "curie") {
         if (enemies.length && now - abilityLast >= 3200) { abilityLast = now; fireCurie(); }
     } else if (charAbility === "joule") {
         jouleTickT += dt;
         if (jouleTickT >= 450) { jouleTickT = 0; jouleAura(); }
     }
-    if (charAbility === "curie") { updatePotions(); updateAcidZones(now); }
+    if (charAbility === "curie") { updatePotions(now); updateAcidZones(now); }
+    for (let i = explosions.length - 1; i >= 0; i--) { explosions[i].life -= dt / 350; if (explosions[i].life <= 0) explosions.splice(i, 1); }
 }
 
 
@@ -653,7 +704,7 @@ sync();
 const skill = {cd: 20000, last: -20000}; 
 
 function useGravSkill() {
-    let n = performance.now();
+    let n = elapsedTime;                 // relogio de jogo
     if(n - skill.last < skill.cd) return;
     skill.last = n;
     
@@ -669,7 +720,7 @@ function useGravSkill() {
         if(dist < 250) { 
             e.x += (dx/dist) * 100;
             e.y += (dy/dist) * 100;
-            e.slowUntil = performance.now() + 1000; 
+            e.slowUntil = elapsedTime + 1000; 
         }
     });
 }
@@ -732,6 +783,7 @@ function showLevel() {
     let available = Object.keys(upLevels).filter(u => {
         if(upLevels[u] >= 5) return false;
         if(u === "Velocidade das orbes" && targetOrbs() < 5) return false;
+        if(u === "Habilidade" && charAbility === "none") return false;   // Padrao nao tem habilidade
         return true;
     });
 
@@ -761,7 +813,9 @@ function showLevel() {
             else extraText = ` (recarga ${PRISM_CD[upLevels[u]] / 1000}s)`;
         }
 
-        b.textContent = `${u} (Nív. ${upLevels[u]} ➔ ${upLevels[u] + 1})${extraText}`;
+        b.textContent = (u === "Habilidade")
+            ? `${ABILITY_NAME[charAbility]} (Nív. ${upLevels[u]} ➔ ${upLevels[u] + 1}) - ${abilityUpDesc(upLevels[u] + 1)}`
+            : `${u} (Nív. ${upLevels[u]} ➔ ${upLevels[u] + 1})${extraText}`;
         b.onclick = () => {
             upLevels[u]++;
             if(u == "Velocidade") p.spd += .04; 
@@ -791,13 +845,14 @@ base.ontouchmove = e => {
 base.ontouchend = () => { joy.a = false; joy.dx = joy.dy = 0; stick.style.transform = 'translate(0,0)'; };
 
 function upd() {
-    let now = performance.now();
-    let dt = now - lastTime;
-    lastTime = now;
+    let real = performance.now();
+    let dt = real - lastTime;
+    lastTime = real;
     
-    if(paused) return;
+    if(paused) return;          // pausado: relogio de jogo congela (cooldowns nao avancam)
     
     elapsedTime += dt;
+    let now = elapsedTime;      // RELOGIO DE JOGO: base de todos os cooldowns (some durante a pausa)
 
     // Vitoria aos 5 minutos
     if (elapsedTime >= 300000 && !won && !p.dead) {
@@ -925,11 +980,16 @@ function upd() {
 
         for(let j=enemies.length-1; j>=0; j--) {
             let e = enemies[j];
-            if(Math.hypot(e.x - a.x, e.y - a.y) < e.r + a.r) {
-                applyDamage(e, 25);
-                apples.splice(i, 1);
-                
-                if(e.hp <= 0) killEnemy(e, j);
+            let dx = e.x - a.x, dy = e.y - a.y, rr = e.r + a.r;
+            if(dx*dx + dy*dy < rr*rr) {
+                if (a.explode) {
+                    apples.splice(i, 1);
+                    explodeAt(a.x, a.y);        // dano em area
+                } else {
+                    applyDamage(e, 25);
+                    apples.splice(i, 1);
+                    if(e.hp <= 0) killEnemy(e, j);
+                }
                 break;
             }
         }
@@ -1175,8 +1235,6 @@ function drawPrism(x, y, alpha) {
 }
 
 function draw() {
-    let tnow = performance.now();
-
     // limpa em espaco de tela (sem zoom)
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.fillStyle = "#071018";
@@ -1230,7 +1288,7 @@ function draw() {
     
     enemies.forEach(e=>{
         if(e.x<vx0-40||e.x>vx1+40||e.y<vy0-40||e.y>vy1+40) return;   // fora da tela: nao desenha
-        ctx.fillStyle = (tnow < e.slowUntil) ? "#e0e0e0" : e.color;
+        ctx.fillStyle = (elapsedTime < e.slowUntil) ? "#e0e0e0" : e.color;
         ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 6.28); ctx.fill();
         if (e.hp < e.maxHp) bar(e.x - e.r, e.y - e.r - 8, e.r * 2, 4, e.hp/e.maxHp, "#f55", "#400");  // barra so se ferido
     });
@@ -1251,25 +1309,39 @@ function draw() {
         ctx.beginPath(); ctx.arc(po.x, po.y, 11, 0, 6.28); ctx.fill();
     });
 
-    // Raio do Tesla (ricochete)
-    if (chainFx.life > 0 && chainFx.pts.length > 1) {
-        let a = Math.max(0, Math.min(1, chainFx.life / 220));
-        ctx.strokeStyle = "rgba(255,236,80," + a.toFixed(2) + ")";
+    // Explosoes (macas explosivas do Newton)
+    explosions.forEach(ex => {
+        let prog = 1 - ex.life;                 // 0 -> 1
+        let rad = ex.r * (0.3 + 0.7 * prog);
+        ctx.globalAlpha = ex.life;
+        ctx.fillStyle = "rgba(255,150,40,0.35)";
+        ctx.beginPath(); ctx.arc(ex.x, ex.y, rad, 0, 6.28); ctx.fill();
+        ctx.strokeStyle = "rgba(255,210,90,0.9)";
         ctx.lineWidth = 3;
-        ctx.lineJoin = "round";
-        ctx.beginPath();
-        ctx.moveTo(chainFx.pts[0].x, chainFx.pts[0].y);
-        for (let i = 1; i < chainFx.pts.length; i++) {
-            let x0 = chainFx.pts[i-1].x, y0 = chainFx.pts[i-1].y, x1 = chainFx.pts[i].x, y1 = chainFx.pts[i].y;
-            // pontos intermediarios deslocados, dando o aspecto irregular do raio
-            let mx = (x0+x1)/2 + (Math.random()-0.5)*22, my = (y0+y1)/2 + (Math.random()-0.5)*22;
-            ctx.lineTo(mx, my); ctx.lineTo(x1, y1);
-        }
-        ctx.stroke();
-        // nucleo branco
-        ctx.strokeStyle = "rgba(255,255,255," + (a*0.9).toFixed(2) + ")";
-        ctx.lineWidth = 1.4;
-        ctx.stroke();
+        ctx.beginPath(); ctx.arc(ex.x, ex.y, rad, 0, 6.28); ctx.stroke();
+        ctx.globalAlpha = 1;
+    });
+
+    // Raios do Tesla (um ou mais ricochetes)
+    if (chainFx.life > 0 && chainFx.chains.length) {
+        let a = Math.max(0, Math.min(1, chainFx.life / 220));
+        chainFx.chains.forEach(pts => {
+            if (pts.length < 2) return;
+            ctx.strokeStyle = "rgba(255,236,80," + a.toFixed(2) + ")";
+            ctx.lineWidth = 3;
+            ctx.lineJoin = "round";
+            ctx.beginPath();
+            ctx.moveTo(pts[0].x, pts[0].y);
+            for (let i = 1; i < pts.length; i++) {
+                let x0 = pts[i-1].x, y0 = pts[i-1].y, x1 = pts[i].x, y1 = pts[i].y;
+                let mx = (x0+x1)/2 + (Math.random()-0.5)*22, my = (y0+y1)/2 + (Math.random()-0.5)*22;
+                ctx.lineTo(mx, my); ctx.lineTo(x1, y1);
+            }
+            ctx.stroke();
+            ctx.strokeStyle = "rgba(255,255,255," + (a*0.9).toFixed(2) + ")";
+            ctx.lineWidth = 1.4;
+            ctx.stroke();
+        });
     }
 
     // ===== Gaiola de Faraday (anel eletrico) =====
@@ -1346,19 +1418,20 @@ function draw() {
         visualGravRadius -= 8;
     }
 
-    // Aura de calor do Joule (ao redor do jogador)
+    // Aura de calor do Joule (ao redor do jogador) - raio cresce com o nivel
     if (charAbility === "joule") {
+        let JR = jouleParams().R;
         let pn = performance.now();
         let pulse = 0.5 + 0.5 * Math.sin(pn / 150);
-        let grd = ctx.createRadialGradient(p.x, p.y, JOULE_R * 0.3, p.x, p.y, JOULE_R);
+        let grd = ctx.createRadialGradient(p.x, p.y, JR * 0.3, p.x, p.y, JR);
         grd.addColorStop(0, "rgba(255,120,30,0)");
         grd.addColorStop(0.7, "rgba(255,120,30," + (0.10 + 0.05 * pulse).toFixed(3) + ")");
         grd.addColorStop(1, "rgba(255,80,20," + (0.20 + 0.08 * pulse).toFixed(3) + ")");
         ctx.fillStyle = grd;
-        ctx.beginPath(); ctx.arc(p.x, p.y, JOULE_R, 0, 6.28); ctx.fill();
+        ctx.beginPath(); ctx.arc(p.x, p.y, JR, 0, 6.28); ctx.fill();
         ctx.strokeStyle = "rgba(255,150,50," + (0.35 + 0.2 * pulse).toFixed(3) + ")";
         ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(p.x, p.y, JOULE_R, 0, 6.28); ctx.stroke();
+        ctx.beginPath(); ctx.arc(p.x, p.y, JR, 0, 6.28); ctx.stroke();
     }
 
     ctx.strokeStyle = "#39d5ff44";
@@ -1485,6 +1558,7 @@ function startGame() {
     CHARS[selectedChar].apply();         // aplica o bonus do personagem
     playerColor = CHARS[selectedChar].color;
     charAbility = CHARS[selectedChar].ability;   // habilidade inicial do personagem
+    upLevels["Habilidade"] = (charAbility === "none") ? 0 : 1;   // comeca no nivel 1
     showScreen("none");
     document.body.classList.remove("menu-open");
     gameStarted = true;
