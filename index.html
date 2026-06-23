@@ -110,6 +110,8 @@
         .charCard{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:13px;align-items:center;padding:13px 15px;border-radius:13px;border:1px solid rgba(255,255,255,.12);background:rgba(12,22,34,.85);color:#eaf6ff;cursor:pointer;text-align:left;transition:transform .08s,border-color .15s}
         .charCard:active{transform:scale(.98)}
         .charCard.sel{border-color:#39d5ff;box-shadow:0 0 18px rgba(57,213,255,.4),inset 0 0 18px rgba(57,213,255,.08)}
+        .charCard.locked{opacity:.55;filter:grayscale(.6);cursor:default}
+        .charCard.locked .charName{color:#8aa0b3}
         .charDot{grid-row:1 / span 2;width:34px;height:34px;border-radius:50%}
         .charName{font-family:'Orbitron',system-ui;font-weight:700;font-size:15px;letter-spacing:.5px}
         .charDesc{font-size:12.5px;color:#9fc4d8}
@@ -242,7 +244,7 @@
             </button>
             <button class="menuBtn" id="btnCollect">
                 <svg class="mIco" viewBox="0 0 24 24" fill="none"><path d="m12 3 2.6 5.6 6 .6-4.5 4 1.3 5.9L12 21l-5.4 3.1L8 18.2l-4.5-4 6-.6L12 3Z" stroke="#7fe9ff" stroke-width="1.5" stroke-linejoin="round"/></svg>
-                Colecionáveis
+                Conquistas
             </button>
             <button class="menuBtn ghost" id="btnPlatform">
                 <svg class="mIco" viewBox="0 0 24 24" fill="none"><path d="M11 6l-6 6 6 6M5 12h14" stroke="#bcd6e6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -263,8 +265,8 @@
     </div>
 
     <div class="screen" id="collectScreen">
-        <div class="screenTitle">COLECIONÁVEIS</div>
-        <div class="screenSub">Conquiste jogando. Cada um traz uma curiosidade de física.</div>
+        <div class="screenTitle">CONQUISTAS</div>
+        <div class="screenSub">Cumpra os desafios para liberar armas e personagens.</div>
         <div class="collectGrid" id="collectGrid"></div>
         <div class="menuBtns"><button class="menuBtn ghost btnBack">Voltar</button></div>
     </div>
@@ -336,32 +338,39 @@ function fmtTime(totalSecs) {
     return m + ":" + s.toString().padStart(2, "0");
 }
 
-// Personagens: cor + bonus passivo + habilidade inicial unica. Tema de fisica.
+// Personagens: cor + bonus passivo + habilidade. req = conquista necessaria (null = sempre liberado).
 const CHARS = [
-    { name: "Padrão",  color: "#ffffff", desc: "Equilibrado, sem habilidade.",                         ability: "none",   apply: () => {} },
-    { name: "Tesla",   color: "#39d5ff", desc: "Raio amarelo que ricocheteia entre inimigos. +10% crítico.", ability: "tesla",  apply: () => { p.critChance += 0.10; } },
-    { name: "Newton",  color: "#b07cff", desc: "Maçãs sequenciadas. +40 de vida máxima.",                ability: "newton", apply: () => { p.maxHp += 40; p.hp = p.maxHp; } },
-    { name: "Curie",   color: "#7cff5b", desc: "Poções radioativas com dano contínuo. +15% de XP.",       ability: "curie",  apply: () => { p.xpMult += 0.15; } },
-    { name: "Joule",   color: "#ffb347", desc: "Aura de calor com dano contínuo. +10% de dano.",          ability: "joule",  apply: () => { p.dmgMult += 0.10; } }
+    { name: "Padrão",   color: "#ffffff", desc: "Equilibrado, sem habilidade.",                          ability: "none",     req: null,        apply: () => {} },
+    { name: "Tesla",    color: "#39d5ff", desc: "Raio que ricocheteia entre inimigos. +10% crítico.",     ability: "tesla",    req: "tesla",     apply: () => { p.critChance += 0.10; } },
+    { name: "Newton",   color: "#b07cff", desc: "Maçãs sequenciadas (podem explodir). +40 de vida.",      ability: "newton",   req: "newton",    apply: () => { p.maxHp += 40; p.hp = p.maxHp; } },
+    { name: "Curie",    color: "#7cff5b", desc: "Poções radioativas com dano contínuo. +15% de XP.",       ability: "curie",    req: "curie",     apply: () => { p.xpMult += 0.15; } },
+    { name: "Joule",    color: "#ffb347", desc: "Aura de calor com dano contínuo. +10% de dano.",          ability: "joule",    req: "joule",     apply: () => { p.dmgMult += 0.10; } },
+    { name: "Einstein", color: "#7c9cff", desc: "Paralisa o tempo dos inimigos e fica intangível por 2s.", ability: "einstein", req: "einstein",  apply: () => {} }
 ];
 
-// Colecionaveis: conquistas com curiosidades de fisica, salvas entre partidas.
-const COLLECTIBLES = [
-    { id: "spark",    name: "Primeira Faísca",      cond: "Derrote 1 inimigo",                 fact: "Energia cinética é a energia do movimento: vale (m·v²)/2.",                check: s => s.kills >= 1 },
-    { id: "cem",      name: "Centena",              cond: "Derrote 100 inimigos",              fact: "A inércia faz um corpo manter seu estado de movimento (1ª Lei de Newton).", check: s => s.kills >= 100 },
-    { id: "min2",     name: "Resistente",           cond: "Sobreviva por 2 minutos",           fact: "Atrito converte energia mecânica em calor.",                              check: s => s.time >= 120 },
-    { id: "nivel10",  name: "Veterano",             cond: "Alcance o nível 10",                fact: "Quanto maior a frequência da luz, maior a energia de seu fóton (E = h·f).",check: s => s.lv >= 10 },
-    { id: "baus",     name: "Caçador de Baús",      cond: "Abra 3 baús",                       fact: "Momento linear (p = m·v) se conserva em colisões isoladas.",              check: s => s.chests >= 3 },
-    { id: "faraday",  name: "Gaiola de Faraday",    cond: "Desbloqueie a Gaiola de Faraday",   fact: "Uma gaiola de Faraday blinda campos elétricos externos.",                 check: s => s.faraday },
-    { id: "prisma",   name: "Prisma de Luz",        cond: "Desbloqueie o Prisma de Luz",       fact: "Um prisma separa a luz branca em todo o seu espectro de cores.",          check: s => s.prism },
-    { id: "horda",    name: "Sobrevivente da Horda",cond: "Sobreviva a uma horda (3 minutos)", fact: "Ressonância amplifica oscilações quando a frequência coincide.",          check: s => s.time >= 180 }
+// Conquistas que liberam conteudo. check(s): s = { time(s), kills(vitalicio), lv, chests, boss }
+const ACHIEVEMENTS = [
+    { id: "maca",        name: "Maçã de Newton",   cond: "Sobreviva 1 minuto",      reward: "Libera o Lançador de Maçãs",   check: s => s.time >= 60 },
+    { id: "prisma",      name: "Espectro",         cond: "Sobreviva 2 minutos",     reward: "Libera o Prisma de Luz",       check: s => s.time >= 120 },
+    { id: "tesla",       name: "Bobina de Tesla",  cond: "Sobreviva 3 minutos",     reward: "Libera o personagem Tesla",    check: s => s.time >= 180 },
+    { id: "newton",      name: "Gravidade",        cond: "Derrote 1.000 inimigos",  reward: "Libera o personagem Newton",   check: s => s.kills >= 1000 },
+    { id: "faraday",     name: "Blindagem",        cond: "Derrote 10.000 inimigos", reward: "Libera a Gaiola de Faraday",   check: s => s.kills >= 10000 },
+    { id: "curie",       name: "Radioatividade",   cond: "Sobreviva 5 minutos",     reward: "Libera a personagem Curie",    check: s => s.time >= 300 },
+    { id: "einstein",    name: "Relatividade",     cond: "Derrote 20.000 inimigos", reward: "Libera o personagem Einstein", check: s => s.kills >= 20000 },
+    { id: "joule",       name: "Termodinâmica",    cond: "Sobreviva 10 minutos",    reward: "Libera o personagem Joule",    check: s => s.time >= 600 },
+    { id: "ressonancia", name: "Caçador de Boss",  cond: "Derrote o Boss (5 min)",  reward: "Libera Ressonância Estrutural",check: s => s.boss }
 ];
 
 // Persistencia tolerante a falhas (localStorage pode nao funcionar offline)
 function loadSet(key) { try { return new Set(JSON.parse(localStorage.getItem(key) || "[]")); } catch (e) { return new Set(); } }
 function saveSet(key, set) { try { localStorage.setItem(key, JSON.stringify([...set])); } catch (e) {} }
-let unlocked = loadSet("ez_unlocked");
-try { let sc = parseInt(localStorage.getItem("ez_char")); if (!isNaN(sc) && CHARS[sc]) selectedChar = sc; } catch (e) {}
+let unlocks = loadSet("ez_ach");                 // conquistas/desbloqueios liberados
+let bossDefeated = false;                        // boss derrotado nesta partida
+let lifetimeBase = 0;                            // abates vitalicios das partidas anteriores
+try { lifetimeBase = parseInt(localStorage.getItem("ez_totalKills")) || 0; } catch (e) {}
+function isUnlocked(id) { return unlocks.has(id); }
+function saveLifetimeKills() { try { localStorage.setItem("ez_totalKills", String(lifetimeBase + kills)); } catch (e) {} }   // valor absoluto (idempotente)
+try { let sc = parseInt(localStorage.getItem("ez_char")); if (!isNaN(sc) && CHARS[sc] && (CHARS[sc].req === null || true)) selectedChar = sc; } catch (e) {}
 
 const enemies = [], drops = [], orbs = [], apples = [], chests = [], dmgTexts = [], zaps = [];
 
@@ -382,12 +391,14 @@ const upLevels = {
     "Chance de crítico": 0,
     "Gaiola de Faraday": 0,
     "Prisma de Luz": 0,
-    "Habilidade": 0
+    "Habilidade": 0,
+    "Ressonância Estrutural": 0
 };
 
 // Tempos de recarga (ms) por nível 1..5
 const FARADAY_CD = [60000, 55000, 50000, 45000, 40000];
 const PRISM_CD   = [10000, 8000, 6000, 4000, 4000];
+const RESO_CD    = [40000, 36000, 32000, 28000, 24000];
 
 const faraday = { active: false, last: -999999, until: 0, r: 210, safe: new Set() };
 const prism   = { active: false, last: -999999, angle: 0, dir: 1, phase: 0, len: 470, bounce: false, hit: new Set() };
@@ -459,17 +470,29 @@ function sndWin()    { notesAt([[523,0,0.14],[659,0.13,0.14],[784,0.26,0.14],[10
 function sndTesla()  { beep(900, 0.08, "square", 0.12, 1700); }
 function sndCurie()  { beep(300, 0.16, "sine",   0.12, 150); }
 function sndExplode(){ beep(150, 0.18, "sawtooth", 0.16, 50); }
+function sndStop()   { notesAt([[700,0,0.06],[500,0.06,0.06],[300,0.12,0.18]], "sine", 0.16); }   // paralisia temporal
+function sndChannel(){ beep(180, 0.5, "sine", 0.10, 320); }                                       // canalizar ressonancia
+function sndReso()   { notesAt([[120,0,0.5],[90,0.1,0.5]], "sawtooth", 0.22); }                   // onda de ressonancia
+function sndBoss()   { notesAt([[110,0,0.3],[90,0.25,0.3],[70,0.5,0.5]], "sawtooth", 0.26); }     // boss aparece
 
 /* ===================== HABILIDADES DE PERSONAGEM ===================== */
 let charAbility = "none";        // definido em startGame conforme o personagem
-let abilityLast = -99999;        // ultimo disparo (tesla / newton / curie)
+let abilityLast = -99999;        // ultimo disparo (tesla / newton / curie / einstein)
 let newtonWhirlLast = -99999;    // ultimo turbilhao (Newton lv5)
 let jouleTickT = 0;              // acumulador de tempo da aura do Joule
+let timeStopUntil = 0;           // ate quando o tempo dos inimigos esta parado (Einstein)
 const chainFx = { chains: [], life: 0 };  // efeito visual dos raios do Tesla (varios)
 const appleSeq = [];             // fila de tempos para soltar macas (Newton)
 const potions = [];              // projeteis de pocao (Curie)
 const acidZones = [];            // pocas radioativas (Curie)
 const explosions = [];           // explosoes (macas explosivas do Newton)
+
+// Boss
+let boss = null, bossSpawned = false;
+const BOSS_TIME = 270000;        // boss aparece aos 4:30 (antes da vitoria em 5:00)
+
+// Ressonancia Estrutural (liberada ao derrotar o boss)
+const reso = { last: -99999, channeling: false, channelEnd: 0, waveActive: false, waveR: 0 };
 
 // Nivel atual da habilidade (1..5; 0 = personagem sem habilidade)
 function abLv() { return upLevels["Habilidade"]; }
@@ -479,15 +502,17 @@ function teslaParams() { let lv = abLv(); return { chainLen: lv <= 3 ? lv + 1 : 
 function curieParams() { let lv = abLv(); return { zoneR: lv <= 3 ? (70 + lv * 17) : 121, count: lv <= 3 ? 1 : (lv - 2) }; } // raio cresce lv1-3 ; pocoes 1/1/1/2/3
 function newtonParams(){ let lv = abLv(); return { count: Math.min(2 + lv, 4), explode: lv >= 4 ? 0.5 : (lv === 3 ? 0.2 : 0) }; } // macas 3/4/4/4/4 ; explosao 0/0/20%/50%/50%
 function jouleParams() { let lv = abLv(); return { R: lv <= 3 ? (95 + lv * 22) : 161, dmg: lv >= 5 ? 18 : (lv === 4 ? 13 : 9) }; }  // raio cresce lv1-3 ; dano 9/9/9/13/18
+function einsteinParams(){ let lv = abLv(); return { dur: 1500 + lv * 500, cd: 11000 - lv * 1000 }; }  // duracao 2/2.5/3/3.5/4s ; cd 10/9/8/7/6s
 
 // Nome e descricao das melhorias da habilidade (para as cartas de upgrade)
-const ABILITY_NAME = { tesla: "Raio Tesla", curie: "Pocao da Curie", newton: "Macas de Newton", joule: "Aura Joule" };
+const ABILITY_NAME = { tesla: "Raio Tesla", curie: "Pocao da Curie", newton: "Macas de Newton", joule: "Aura Joule", einstein: "Paralisia Temporal" };
 function abilityUpDesc(toLv) {
     let m = {
-        tesla:  { 2: "ricocheteia em 3", 3: "ricocheteia em 4", 4: "+1 raio", 5: "+1 raio (3 no total)" },
-        curie:  { 2: "raio maior", 3: "raio ainda maior", 4: "+1 pocao", 5: "+1 pocao (3 no total)" },
-        newton: { 2: "+1 maca", 3: "macas explodem 20%", 4: "macas explodem 50%", 5: "turbilhao explosivo" },
-        joule:  { 2: "area maior", 3: "area ainda maior", 4: "+dano na area", 5: "+dano (maximo)" }
+        tesla:    { 2: "ricocheteia em 3", 3: "ricocheteia em 4", 4: "+1 raio", 5: "+1 raio (3 no total)" },
+        curie:    { 2: "raio maior", 3: "raio ainda maior", 4: "+1 pocao", 5: "+1 pocao (3 no total)" },
+        newton:   { 2: "+1 maca", 3: "macas explodem 20%", 4: "macas explodem 50%", 5: "turbilhao explosivo" },
+        joule:    { 2: "area maior", 3: "area ainda maior", 4: "+dano na area", 5: "+dano (maximo)" },
+        einstein: { 2: "+duracao e -recarga", 3: "+duracao e -recarga", 4: "+duracao e -recarga", 5: "4s parados, recarga 6s" }
     };
     return (m[charAbility] && m[charAbility][toLv]) || "";
 }
@@ -600,6 +625,31 @@ function jouleAura() {
     }
 }
 
+// --- Ressonancia Estrutural (liberada ao derrotar o boss) ---
+function updateReso(now, dt) {
+    let lv = upLevels["Ressonância Estrutural"];
+    if (lv <= 0) return;
+    let cd = RESO_CD[lv - 1];
+    if (!reso.channeling && !reso.waveActive && now - reso.last >= cd) {
+        reso.channeling = true; reso.channelEnd = now + 3000; reso.last = now; sndChannel();
+    }
+    if (reso.channeling && now >= reso.channelEnd) {
+        reso.channeling = false; reso.waveActive = true; reso.waveR = 0; reso.bossHit = false; sndReso();
+    }
+    if (reso.waveActive) {
+        reso.waveR += 0.7 * dt;                 // expande ~700px/s
+        let wr2 = reso.waveR * reso.waveR;
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            let e = enemies[i], dx = e.x - p.x, dy = e.y - p.y;
+            if (dx*dx + dy*dy <= wr2) {
+                if (e.isBoss) { if (!reso.bossHit) { reso.bossHit = true; applyDamage(e, 800); if (e.hp <= 0) killEnemy(e, i); } }
+                else { explosions.push({ x: e.x, y: e.y, r: 44, life: 1 }); killEnemy(e, i); }   // demais explodem
+            }
+        }
+        if (reso.waveR > 1400) reso.waveActive = false;
+    }
+}
+
 // Atualiza a habilidade do personagem ativo
 function updateAbilities(now, dt) {
     if (charAbility === "tesla") {
@@ -618,8 +668,12 @@ function updateAbilities(now, dt) {
     } else if (charAbility === "joule") {
         jouleTickT += dt;
         if (jouleTickT >= 450) { jouleTickT = 0; jouleAura(); }
+    } else if (charAbility === "einstein") {
+        let ep = einsteinParams();
+        if (enemies.length && now - abilityLast >= ep.cd) { abilityLast = now; timeStopUntil = now + ep.dur; sndStop(); }
     }
     if (charAbility === "curie") { updatePotions(now); updateAcidZones(now); }
+    updateReso(now, dt);
     for (let i = explosions.length - 1; i >= 0; i--) { explosions[i].life -= dt / 350; if (explosions[i].life <= 0) explosions.splice(i, 1); }
 }
 
@@ -752,6 +806,20 @@ function applyDamage(e, rawDmg) {
 
 // Remove um inimigo, gera drops/baus, conta abate e repoe a horda.
 function killEnemy(e, idx) {
+    if (e.isBoss) {
+        // Boss derrotado: solta varios baus, marca conquista e libera Ressonancia Estrutural
+        for (let k = 0; k < 4; k++) chests.push({x: e.x + Math.random()*40 - 20, y: e.y + Math.random()*40 - 20, r: 16, grav: false});
+        explosions.push({ x: e.x, y: e.y, r: 120, life: 1 });
+        boss = null;
+        bossDefeated = true;
+        enemies.splice(idx, 1);
+        kills++;
+        sndReso();
+        checkUnlocks();
+        showToast("BOSS DERROTADO!");
+        spawnEnemy();
+        return;
+    }
     if (e.chest) chests.push({x: e.x, y: e.y, r: 16, grav: false});
     else for (let k = 0; k < e.drops; k++) drops.push({x: e.x + Math.random()*20 - 10, y: e.y + Math.random()*20 - 10, grav: false});
     enemies.splice(idx, 1);
@@ -784,6 +852,11 @@ function showLevel() {
         if(upLevels[u] >= 5) return false;
         if(u === "Velocidade das orbes" && targetOrbs() < 5) return false;
         if(u === "Habilidade" && charAbility === "none") return false;   // Padrao nao tem habilidade
+        // Armas liberadas por conquistas
+        if(u === "Lançadora de maçãs" && !isUnlocked("maca")) return false;
+        if(u === "Prisma de Luz" && !isUnlocked("prisma")) return false;
+        if(u === "Gaiola de Faraday" && !isUnlocked("faraday")) return false;
+        if(u === "Ressonância Estrutural" && !isUnlocked("ressonancia")) return false;
         return true;
     });
 
@@ -811,6 +884,8 @@ function showLevel() {
             if (upLevels[u] === 0) extraText = " (Nova Arma - recarga 10s)";
             else if (upLevels[u] === 4) extraText = " (laser vai e volta)";
             else extraText = ` (recarga ${PRISM_CD[upLevels[u]] / 1000}s)`;
+        } else if (u === "Ressonância Estrutural") {
+            extraText = upLevels[u] === 0 ? " (Nova - canaliza 3s, recarga 40s)" : ` (recarga ${RESO_CD[upLevels[u]] / 1000}s)`;
         }
 
         b.textContent = (u === "Habilidade")
@@ -903,10 +978,20 @@ function upd() {
             enemies.push({
                 x: p.x + (Math.random() - 0.5) * 2000, 
                 y: p.y + (Math.random() - 0.5) * 2000,
-                vx: 0, vy: 0, r: 14, hp: 20, maxHp: 20, color: "#f1c40f", drops: 1, chest: false, spdMult: 0.7,
+                vx: 0, vy: 0, r: 14, hp: 20, maxHp: 20, color: "#f1c40f", drops: 1, chest: false, spdMult: 1.1,
                 hitOrbs: new Set(), slowUntil: 0
             });
         }
+    }
+
+    // Boss aos 4:30 (antes da vitoria): inimigo grande com barra exposta
+    if (!bossSpawned && elapsedTime >= BOSS_TIME) {
+        bossSpawned = true;
+        let sp = spawnPos();
+        boss = { x: sp.x, y: sp.y, vx: 0, vy: 0, r: 58, hp: 3000, maxHp: 3000, color: "#ff3b6b", drops: 6, chest: false, spdMult: 0.4, hitOrbs: new Set(), slowUntil: 0, isBoss: true };
+        enemies.push(boss);
+        sndBoss();
+        showToast("O BOSS APARECEU!");
     }
 
     baseOrbAngle += p.orbSpeed;
@@ -1084,55 +1169,60 @@ function upd() {
         if (cell) cell.push(i); else grid.set(key, [i]);
     }
 
+    let frozen = now < timeStopUntil;   // Einstein: tempo dos inimigos parado
+
     for(let i=0; i<enemies.length; i++){
         let e1 = enemies[i];
         let cx = Math.floor(e1.x / CELL), cy = Math.floor(e1.y / CELL);
 
-        // Checa colisao apenas contra vizinhos das 9 celulas ao redor
-        for (let gx = cx - 1; gx <= cx + 1; gx++) {
-            for (let gy = cy - 1; gy <= cy + 1; gy++) {
-                let cell = grid.get(gx + "," + gy);
-                if (!cell) continue;
-                for (let cidx = 0; cidx < cell.length; cidx++) {
-                    let j = cell[cidx];
-                    if (j <= i) continue;          // cada par e tratado uma unica vez
-                    let e2 = enemies[j];
-                    let dx = e2.x - e1.x, dy = e2.y - e1.y;
-                    let d2 = dx*dx + dy*dy;
-                    let minDist = e1.r + e2.r;
-                    if(d2 < minDist*minDist && d2 > 0) {       // raiz so quando ha sobreposicao
-                        let dist = Math.sqrt(d2);
-                        let overlap = minDist - dist;
-                        let nx = dx / dist, ny = dy / dist;
-                        e1.x -= nx * overlap * 0.5;
-                        e1.y -= ny * overlap * 0.5;
-                        e2.x += nx * overlap * 0.5;
-                        e2.y += ny * overlap * 0.5;
+        if (!frozen) {
+            // Checa colisao apenas contra vizinhos das 9 celulas ao redor
+            for (let gx = cx - 1; gx <= cx + 1; gx++) {
+                for (let gy = cy - 1; gy <= cy + 1; gy++) {
+                    let cell = grid.get(gx + "," + gy);
+                    if (!cell) continue;
+                    for (let cidx = 0; cidx < cell.length; cidx++) {
+                        let j = cell[cidx];
+                        if (j <= i) continue;          // cada par e tratado uma unica vez
+                        let e2 = enemies[j];
+                        let dx = e2.x - e1.x, dy = e2.y - e1.y;
+                        let d2 = dx*dx + dy*dy;
+                        let minDist = e1.r + e2.r;
+                        if(d2 < minDist*minDist && d2 > 0) {       // raiz so quando ha sobreposicao
+                            let dist = Math.sqrt(d2);
+                            let overlap = minDist - dist;
+                            let nx = dx / dist, ny = dy / dist;
+                            e1.x -= nx * overlap * 0.5;
+                            e1.y -= ny * overlap * 0.5;
+                            e2.x += nx * overlap * 0.5;
+                            e2.y += ny * overlap * 0.5;
+                        }
                     }
                 }
             }
         }
 
         let dxP = p.x - e1.x, dyP = p.y - e1.y, dP = Math.max(1, Math.hypot(dxP, dyP));
-        
-        let isSlowed = now < e1.slowUntil;
-        let speedPenalty = isSlowed ? 0.3 : 1.0; 
 
-        e1.vx += (dxP/dP) * .02 * e1.spdMult * globalSpeedMult * speedPenalty;
-        e1.vy += (dyP/dP) * .02 * e1.spdMult * globalSpeedMult * speedPenalty;
-        e1.vx *= .98;
-        e1.vy *= .98;
+        if (!frozen) {
+            let isSlowed = now < e1.slowUntil;
+            let speedPenalty = isSlowed ? 0.3 : 1.0; 
+            e1.vx += (dxP/dP) * .02 * e1.spdMult * globalSpeedMult * speedPenalty;
+            e1.vy += (dyP/dP) * .02 * e1.spdMult * globalSpeedMult * speedPenalty;
+            e1.vx *= .98;
+            e1.vy *= .98;
+        }
         
-        if(dP < e1.r + p.r){
+        if(dP < e1.r + p.r && !frozen){     // durante a paralisia o jogador atravessa (intangivel)
             let o = e1.r + p.r - dP, nxP = dxP/dP, nyP = dyP/dP;
             p.x += nxP * o * .5; p.y += nyP * o * .5;
             e1.x -= nxP * o * .5; e1.y -= nyP * o * .5;
-            p.hp = Math.max(0, p.hp - .15);
-            hurtFlash = Math.min(0.8, hurtFlash + 0.10);   // flash vermelho
+            p.hp = Math.max(0, p.hp - (e1.isBoss ? 0.6 : 0.15));
+            hurtFlash = Math.min(0.85, hurtFlash + (e1.isBoss ? 0.25 : 0.10));
             sndHurt();
         }
         
-        e1.x += e1.vx; e1.y += e1.vy;
+        if (!frozen) { e1.x += e1.vx; e1.y += e1.vy; }
     }
 
     for(let i=drops.length-1; i>=0; i--){
@@ -1190,7 +1280,7 @@ function upd() {
         updateWep(wepPri, upLevels["Prisma de Luz"], prism.last, PRISM_CD, now, prism.active);
     }
 
-    checkCollectibles();
+    checkUnlocks();
 }
 let hudTick = 0;
 
@@ -1286,11 +1376,26 @@ function draw() {
         ctx.fillRect(c.x - 3, c.y - 2, 6, 4);
     });
     
+    let frozenNow = elapsedTime < timeStopUntil;
     enemies.forEach(e=>{
-        if(e.x<vx0-40||e.x>vx1+40||e.y<vy0-40||e.y>vy1+40) return;   // fora da tela: nao desenha
-        ctx.fillStyle = (elapsedTime < e.slowUntil) ? "#e0e0e0" : e.color;
-        ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 6.28); ctx.fill();
-        if (e.hp < e.maxHp) bar(e.x - e.r, e.y - e.r - 8, e.r * 2, 4, e.hp/e.maxHp, "#f55", "#400");  // barra so se ferido
+        let cullM = e.isBoss ? 80 : 40;
+        if(e.x<vx0-cullM||e.x>vx1+cullM||e.y<vy0-cullM||e.y>vy1+cullM) return;   // fora da tela: nao desenha
+        if (e.isBoss) {
+            ctx.save();
+            ctx.shadowBlur = 22; ctx.shadowColor = "#ff3b6b";
+            ctx.fillStyle = frozenNow ? "#9fb6ff" : e.color;
+            ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 6.28); ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.lineWidth = 3; ctx.strokeStyle = "#ffd0dc";
+            ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 6.28); ctx.stroke();
+            ctx.restore();
+            // barra exposta sempre visivel, maior, acima do boss
+            bar(e.x - e.r, e.y - e.r - 14, e.r * 2, 8, e.hp / e.maxHp, "#ff3b6b", "#3a0d18");
+        } else {
+            ctx.fillStyle = frozenNow ? "#9fb6ff" : ((elapsedTime < e.slowUntil) ? "#e0e0e0" : e.color);
+            ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 6.28); ctx.fill();
+            if (e.hp < e.maxHp) bar(e.x - e.r, e.y - e.r - 8, e.r * 2, 4, e.hp/e.maxHp, "#f55", "#400");  // barra so se ferido
+        }
     });
     
     orbs.forEach(o=>{
@@ -1434,13 +1539,37 @@ function draw() {
         ctx.beginPath(); ctx.arc(p.x, p.y, JR, 0, 6.28); ctx.stroke();
     }
 
+    // Ressonancia Estrutural: anel de canalizacao e onda sonora
+    if (reso.channeling) {
+        let prog = 1 - Math.max(0, (reso.channelEnd - elapsedTime) / 3000);
+        let pn2 = performance.now();
+        ctx.strokeStyle = "rgba(170,240,255,0.8)";
+        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 40 + 8 * Math.sin(pn2 / 80), 0, Math.PI * 2 * prog); ctx.stroke();
+    }
+    if (reso.waveActive) {
+        ctx.strokeStyle = "rgba(180,245,255,0.85)";
+        ctx.lineWidth = 8;
+        ctx.beginPath(); ctx.arc(p.x, p.y, reso.waveR, 0, 6.28); ctx.stroke();
+        ctx.strokeStyle = "rgba(120,210,255,0.4)";
+        ctx.lineWidth = 22;
+        ctx.beginPath(); ctx.arc(p.x, p.y, reso.waveR, 0, 6.28); ctx.stroke();
+    }
+
     ctx.strokeStyle = "#39d5ff44";
     ctx.beginPath(); ctx.arc(p.x, p.y, p.pickup, 0, 6.28); ctx.stroke();
     
     ctx.save();
     ctx.shadowBlur = 14; ctx.shadowColor = playerColor;
     ctx.fillStyle = playerColor;
+    ctx.globalAlpha = frozenNow ? 0.55 : 1;       // intangivel durante a paralisia: jogador semitransparente
     ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.28); ctx.fill();
+    ctx.globalAlpha = 1;
+    if (frozenNow) {                               // anel indicando intangibilidade
+        ctx.strokeStyle = "rgba(124,156,255,0.9)";
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 6, 0, 6.28); ctx.stroke();
+    }
     ctx.restore();
 
     // Prisma flutuante sobre o personagem (quando a arma esta ativa)
@@ -1471,8 +1600,14 @@ function draw() {
     });
     ctx.globalAlpha = 1.0;
     
-    // volta ao espaco de tela (sem zoom) para a vinheta
+    // volta ao espaco de tela (sem zoom) para a vinheta e HUD do boss
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    // Tint azulado durante a paralisia temporal (Einstein)
+    if (elapsedTime < timeStopUntil) {
+        ctx.fillStyle = "rgba(80,120,255,0.10)";
+        ctx.fillRect(0, 0, innerWidth, innerHeight);
+    }
 
     // Flash vermelho ao tomar dano (vinheta em espaco de tela)
     if (hurtFlash > 0.01) {
@@ -1482,6 +1617,17 @@ function draw() {
         g.addColorStop(1, "rgba(255,0,0," + (0.55 * hurtFlash).toFixed(3) + ")");
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, innerWidth, innerHeight);
+    }
+
+    // Barra de vida do boss exposta no topo da tela
+    if (boss && boss.hp > 0) {
+        let bw = Math.min(innerWidth - 40, 460), bx = (innerWidth - bw) / 2, by = 96;
+        ctx.fillStyle = "rgba(8,14,23,0.85)";
+        ctx.fillRect(bx - 4, by - 20, bw + 8, 34);
+        ctx.fillStyle = "#3a0d18"; ctx.fillRect(bx, by, bw, 12);
+        ctx.fillStyle = "#ff3b6b"; ctx.fillRect(bx, by, bw * Math.max(0, boss.hp / boss.maxHp), 12);
+        ctx.fillStyle = "#ffd0dc"; ctx.font = "bold 12px system-ui"; ctx.textAlign = "center";
+        ctx.fillText("BOSS", innerWidth / 2, by - 6);
     }
 }
 
@@ -1502,13 +1648,22 @@ function showScreen(name) {
 function renderChars() {
     charGrid.innerHTML = "";
     CHARS.forEach((ch, i) => {
+        let locked = ch.req !== null && !isUnlocked(ch.req);
         let card = document.createElement("button");
-        card.className = "charCard" + (i === selectedChar ? " sel" : "");
-        card.innerHTML =
-            `<span class="charDot" style="background:${ch.color};box-shadow:0 0 14px ${ch.color}"></span>` +
-            `<span class="charName">${ch.name}</span>` +
-            `<span class="charDesc">${ch.desc}</span>`;
-        card.onclick = () => { selectedChar = i; saveChar(); renderChars(); };
+        card.className = "charCard" + (i === selectedChar && !locked ? " sel" : "") + (locked ? " locked" : "");
+        if (locked) {
+            let a = ACHIEVEMENTS.find(x => x.id === ch.req);
+            card.innerHTML =
+                `<span class="charDot" style="background:#2a3647"></span>` +
+                `<span class="charName">${ch.name} (bloqueado)</span>` +
+                `<span class="charDesc">${a ? a.cond : ""}</span>`;
+        } else {
+            card.innerHTML =
+                `<span class="charDot" style="background:${ch.color};box-shadow:0 0 14px ${ch.color}"></span>` +
+                `<span class="charName">${ch.name}</span>` +
+                `<span class="charDesc">${ch.desc}</span>`;
+            card.onclick = () => { selectedChar = i; saveChar(); renderChars(); };
+        }
         charGrid.appendChild(card);
     });
 }
@@ -1516,30 +1671,33 @@ function saveChar() { try { localStorage.setItem("ez_char", String(selectedChar)
 
 function renderCollectibles() {
     collectGrid.innerHTML = "";
-    COLLECTIBLES.forEach(col => {
-        let got = unlocked.has(col.id);
+    let lifeKills = lifetimeBase + kills;
+    ACHIEVEMENTS.forEach(a => {
+        let got = unlocks.has(a.id);
+        let prog = "";
+        if (!got && a.id === "newton")   prog = ` (${lifeKills}/1000)`;
+        if (!got && a.id === "faraday")  prog = ` (${lifeKills}/10000)`;
+        if (!got && a.id === "einstein") prog = ` (${lifeKills}/20000)`;
         let card = document.createElement("div");
         card.className = "colCard" + (got ? " got" : "");
         card.innerHTML = got
-            ? `<span class="colIco">✦</span><span class="colName">${col.name}</span><span class="colFact">${col.fact}</span>`
-            : `<span class="colIco">?</span><span class="colName">Bloqueado</span><span class="colFact">${col.cond}</span>`;
+            ? `<span class="colIco">✦</span><span class="colName">${a.name}</span><span class="colFact">${a.reward}</span>`
+            : `<span class="colIco">?</span><span class="colName">${a.cond}${prog}</span><span class="colFact">${a.reward}</span>`;
         collectGrid.appendChild(card);
     });
 }
 
 function snapshot() {
-    return {
-        kills: kills, time: elapsedTime / 1000, lv: p.lv, chests: chestsOpened,
-        faraday: upLevels["Gaiola de Faraday"] > 0, prism: upLevels["Prisma de Luz"] > 0
-    };
+    return { kills: lifetimeBase + kills, time: elapsedTime / 1000, lv: p.lv, chests: chestsOpened, boss: bossDefeated };
 }
-function checkCollectibles() {
+function checkUnlocks() {
     let st = snapshot();
-    COLLECTIBLES.forEach(col => {
-        if (!unlocked.has(col.id) && col.check(st)) {
-            unlocked.add(col.id);
-            saveSet("ez_unlocked", unlocked);
-            showToast("Colecionável: " + col.name);
+    ACHIEVEMENTS.forEach(a => {
+        if (!unlocks.has(a.id) && a.check(st)) {
+            unlocks.add(a.id);
+            saveSet("ez_ach", unlocks);
+            sndChest();
+            showToast(a.reward);
         }
     });
 }
@@ -1548,13 +1706,14 @@ let toastTimer = null;
 function showToast(text) {
     toastEl.textContent = text;
     toastEl.classList.add("show");
-    sndChest();
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2600);
 }
 
 function startGame() {
     unlockAudio();
+    // se o personagem selecionado estiver bloqueado, volta para o Padrao
+    if (CHARS[selectedChar].req !== null && !isUnlocked(CHARS[selectedChar].req)) selectedChar = 0;
     CHARS[selectedChar].apply();         // aplica o bonus do personagem
     playerColor = CHARS[selectedChar].color;
     charAbility = CHARS[selectedChar].ability;   // habilidade inicial do personagem
@@ -1578,6 +1737,7 @@ function endRun(result) {
     if (nrKills) records.kills = kills;
     if (nrLevel) records.level = p.lv;
     saveRecords();
+    saveLifetimeKills();         // atualiza abates vitalicios (idempotente: salva base + kills)
 
     let star = v => v ? " ★" : "";
     let stats = `Tempo: ${fmtTime(secsTotal)}${star(nrTime)} | Abates: ${kills}${star(nrKills)} | Nível: ${p.lv}${star(nrLevel)}`;
