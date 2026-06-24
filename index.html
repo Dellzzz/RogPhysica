@@ -130,6 +130,13 @@
 
         /* Tela de vitoria */
         #winScreen{display:none;position:fixed;inset:0;z-index:11;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center;color:#eaf6ff;background:radial-gradient(circle at 50% 35%,rgba(20,42,60,.92),rgba(5,10,16,.97));backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+        #bossReward{display:none;position:fixed;inset:0;z-index:12;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;color:#eaf6ff;background:radial-gradient(circle at 50% 35%,rgba(60,16,30,.94),rgba(8,5,10,.97));backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+        .rewardGrid{display:flex;flex-direction:column;gap:14px;width:min(88vw,420px);margin-top:6px}
+        .rewardCard{display:flex;flex-direction:column;gap:6px;text-align:left;padding:16px 18px;border-radius:14px;cursor:pointer;background:linear-gradient(180deg,rgba(20,42,60,.6),rgba(10,20,30,.6));border:1.5px solid rgba(127,233,255,.35);transition:transform .08s,border-color .12s}
+        .rewardCard:active{transform:scale(.98)}
+        .rewardCard:hover{border-color:rgba(127,233,255,.8)}
+        .rwName{font-family:'Orbitron',system-ui;font-weight:800;font-size:17px;letter-spacing:1px;color:#7fe9ff}
+        .rwDesc{font-family:'Rajdhani',system-ui;font-weight:600;font-size:14px;line-height:1.35;color:#cfe6f5}
         .winTitle{font-family:'Orbitron',system-ui;font-weight:800;font-size:42px;letter-spacing:3px;color:#7fe9ff;text-shadow:0 0 28px rgba(57,213,255,.6);margin-bottom:14px}
         .winMsg{font-family:'Rajdhani',system-ui;font-weight:600;font-size:19px;line-height:1.4;max-width:440px;color:#dff0fb;margin-bottom:16px}
         #winStats{font-family:'Rajdhani',system-ui;font-size:16px;color:#bcd6e6;margin-bottom:10px}
@@ -228,6 +235,21 @@
         <div class="winBtns">
             <button id="btnContinue" class="winBtn primary">Continuar</button>
             <button id="btnWinMenu" class="winBtn ghost">Voltar para o menu</button>
+        </div>
+    </div>
+
+    <div id="bossReward">
+        <h1 class="winTitle">BOSS DERROTADO!</h1>
+        <p class="winMsg">Escolha sua recompensa (disponível na próxima partida):</p>
+        <div class="rewardGrid">
+            <button class="rewardCard" id="btnRewReso">
+                <span class="rwName">Ressonância Estrutural</span>
+                <span class="rwDesc">Canaliza 3s e dispara uma onda que faz inimigos próximos explodirem. Recarga 40s.</span>
+            </button>
+            <button class="rewardCard" id="btnRewReacao">
+                <span class="rwName">Reação em Cadeia</span>
+                <span class="rwDesc">Partícula que se divide a cada inimigo atingido (até 256). Destrói os itens, salvo a chance de preservá-los. Recarga 45s.</span>
+            </button>
         </div>
     </div>
 
@@ -357,8 +379,7 @@ const ACHIEVEMENTS = [
     { id: "faraday",     name: "Blindagem",        cond: "Derrote 10.000 inimigos", reward: "Libera a Gaiola de Faraday",   check: s => s.kills >= 10000 },
     { id: "curie",       name: "Radioatividade",   cond: "Sobreviva 5 minutos",     reward: "Libera a personagem Curie",    check: s => s.time >= 300 },
     { id: "einstein",    name: "Relatividade",     cond: "Derrote 20.000 inimigos", reward: "Libera o personagem Einstein", check: s => s.kills >= 20000 },
-    { id: "joule",       name: "Termodinâmica",    cond: "Sobreviva 10 minutos",    reward: "Libera o personagem Joule",    check: s => s.time >= 600 },
-    { id: "ressonancia", name: "Caçador de Boss",  cond: "Derrote o Boss (5 min)",  reward: "Libera Ressonância Estrutural",check: s => s.boss }
+    { id: "joule",       name: "Termodinâmica",    cond: "Sobreviva 10 minutos",    reward: "Libera o personagem Joule",    check: s => s.time >= 600 }
 ];
 
 // Persistencia tolerante a falhas (localStorage pode nao funcionar offline)
@@ -368,7 +389,9 @@ let unlocks = loadSet("ez_ach");                 // conquistas/desbloqueios libe
 let bossDefeated = false;                        // boss derrotado nesta partida
 let lifetimeBase = 0;                            // abates vitalicios das partidas anteriores
 try { lifetimeBase = parseInt(localStorage.getItem("ez_totalKills")) || 0; } catch (e) {}
-function isUnlocked(id) { return unlocks.has(id); }
+function isUnlocked(id) { return unlocks.has(id); }                  // persistente (menus)
+let activeUnlocks = new Set(unlocks);                                // itens valendo NESTA partida (fixado no inicio)
+function isActive(id) { return activeUnlocks.has(id); }             // gate das armas dentro do jogo
 function saveLifetimeKills() { try { localStorage.setItem("ez_totalKills", String(lifetimeBase + kills)); } catch (e) {} }   // valor absoluto (idempotente)
 try { let sc = parseInt(localStorage.getItem("ez_char")); if (!isNaN(sc) && CHARS[sc] && (CHARS[sc].req === null || true)) selectedChar = sc; } catch (e) {}
 
@@ -392,13 +415,22 @@ const upLevels = {
     "Gaiola de Faraday": 0,
     "Prisma de Luz": 0,
     "Habilidade": 0,
-    "Ressonância Estrutural": 0
+    "Ressonância Estrutural": 0,
+    "Reação em Cadeia": 0
 };
 
 // Tempos de recarga (ms) por nível 1..5
 const FARADAY_CD = [60000, 55000, 50000, 45000, 40000];
 const PRISM_CD   = [10000, 8000, 6000, 4000, 4000];
 const RESO_CD    = [40000, 36000, 32000, 28000, 24000];
+
+const GAME_SPEED = 1.5;            // velocidade geral do jogo (1.5x apenas no movimento/acao)
+const ENEMY_MAX_LIFE = 120000;     // inimigo some apos 2 min no mapa
+const RESO_RADIUS = 240;           // alcance da Ressonancia (um pouco maior que a Gaiola, r=210)
+const TESLA_STUN = 500;            // raio de Tesla paralisa o inimigo por 0,5s
+const REACAO_CD = 45000;           // recarga da Reacao em Cadeia (fixa, 45s)
+const REACAO_PRESERVE = [0.05, 0.10, 0.15, 0.20, 0.25];   // chance do item NAO ser destruido por nivel
+const REACAO_DEPTH = 9;            // particula original + 8 divisoes -> ate 256 alvos (teto)
 
 const faraday = { active: false, last: -999999, until: 0, r: 210, safe: new Set() };
 const prism   = { active: false, last: -999999, angle: 0, dir: 1, phase: 0, len: 470, bounce: false, hit: new Set() };
@@ -473,6 +505,7 @@ function sndExplode(){ beep(150, 0.18, "sawtooth", 0.16, 50); }
 function sndStop()   { notesAt([[700,0,0.06],[500,0.06,0.06],[300,0.12,0.18]], "sine", 0.16); }   // paralisia temporal
 function sndChannel(){ beep(180, 0.5, "sine", 0.10, 320); }                                       // canalizar ressonancia
 function sndReso()   { notesAt([[120,0,0.5],[90,0.1,0.5]], "sawtooth", 0.22); }                   // onda de ressonancia
+function sndReacao() { notesAt([[900,0,0.05],[1300,0.05,0.05],[1700,0.10,0.05],[2100,0.15,0.06]], "square", 0.13); }   // reacao em cadeia
 function sndBoss()   { notesAt([[110,0,0.3],[90,0.25,0.3],[70,0.5,0.5]], "sawtooth", 0.26); }     // boss aparece
 
 /* ===================== HABILIDADES DE PERSONAGEM ===================== */
@@ -493,6 +526,9 @@ const BOSS_TIME = 270000;        // boss aparece aos 4:30 (antes da vitoria em 5
 
 // Ressonancia Estrutural (liberada ao derrotar o boss)
 const reso = { last: -99999, channeling: false, channelEnd: 0, waveActive: false, waveR: 0 };
+// Reacao em Cadeia (liberada ao derrotar o boss; alternativa a Ressonancia)
+const reacao = { last: -99999, links: [], life: 0 };
+let bossRewardPending = false;   // tela de escolha do premio do boss esta aberta
 
 // Nivel atual da habilidade (1..5; 0 = personagem sem habilidade)
 function abLv() { return upLevels["Habilidade"]; }
@@ -547,6 +583,7 @@ function fireTesla() {
             let e = enemies[best];
             nodes.push({ x: e.x, y: e.y });
             applyDamage(e, 18);
+            if (!e.isBoss) e.stunUntil = elapsedTime + TESLA_STUN;   // paralisa 0,5s
             cx = e.x; cy = e.y;
         }
         if (nodes.length) allChains.push([{ x: p.x, y: p.y }].concat(nodes));
@@ -589,7 +626,7 @@ function fireCurie() {
 function updatePotions(now) {
     for (let i = potions.length - 1; i >= 0; i--) {
         let po = potions[i];
-        po.x += po.vx; po.y += po.vy; po.dist += 6;
+        po.x += po.vx * GAME_SPEED; po.y += po.vy * GAME_SPEED; po.dist += 6 * GAME_SPEED;
         let hit = false;
         for (let j = 0; j < enemies.length; j++) {
             let e = enemies[j], dx = e.x - po.x, dy = e.y - po.y, rr = e.r + 8;
@@ -637,17 +674,68 @@ function updateReso(now, dt) {
         reso.channeling = false; reso.waveActive = true; reso.waveR = 0; reso.bossHit = false; sndReso();
     }
     if (reso.waveActive) {
-        reso.waveR += 0.7 * dt;                 // expande ~700px/s
+        reso.waveR += 0.7 * dt * GAME_SPEED;     // expande junto com a velocidade do jogo
         let wr2 = reso.waveR * reso.waveR;
         for (let i = enemies.length - 1; i >= 0; i--) {
             let e = enemies[i], dx = e.x - p.x, dy = e.y - p.y;
+            if (e.isBoss) continue;              // chefe imune ao abate instantaneo
             if (dx*dx + dy*dy <= wr2) {
-                if (e.isBoss) { if (!reso.bossHit) { reso.bossHit = true; applyDamage(e, 800); if (e.hp <= 0) killEnemy(e, i); } }
-                else { explosions.push({ x: e.x, y: e.y, r: 44, life: 1 }); killEnemy(e, i); }   // demais explodem
+                explosions.push({ x: e.x, y: e.y, r: 44, life: 1 }); killEnemy(e, i);   // demais explodem
             }
         }
-        if (reso.waveR > 1400) reso.waveActive = false;
+        if (reso.waveR > RESO_RADIUS) reso.waveActive = false;   // alcance um pouco maior que a Gaiola
     }
+}
+
+// --- Reacao em Cadeia (liberada ao derrotar o boss) ---
+// Dispara uma particula; cada inimigo atingido divide em duas, ate 8 vezes (256 alvos).
+// Inimigos atingidos sao destruidos; itens tambem, salvo a chance de preservacao por nivel. Chefe imune.
+function fireReacao() {
+    let lv = upLevels["Reação em Cadeia"];
+    let preserve = REACAO_PRESERVE[lv - 1];
+    let hit = new Set(), links = [];
+    let frontier = [{ x: p.x, y: p.y }];
+    let range2 = 460 * 460, total = 0;
+    for (let gen = 0; gen < REACAO_DEPTH && total < 256; gen++) {
+        let next = [];
+        for (let s = 0; s < frontier.length; s++) {
+            if (total >= 256) break;
+            let src = frontier[s], best = null, bestD = range2;
+            for (let k = 0; k < enemies.length; k++) {
+                let e = enemies[k];
+                if (e.isBoss || hit.has(e)) continue;       // chefe imune; nao repete alvo
+                let dx = e.x - src.x, dy = e.y - src.y, d2 = dx*dx + dy*dy;
+                if (d2 < bestD) { bestD = d2; best = e; }
+            }
+            if (best) {
+                hit.add(best); total++;
+                links.push({ x1: src.x, y1: src.y, x2: best.x, y2: best.y });
+                next.push({ x: best.x, y: best.y });        // divide em duas
+                next.push({ x: best.x, y: best.y });
+            }
+        }
+        frontier = next;
+        if (!frontier.length) break;
+    }
+    // Destroi os atingidos (drops so caem se a chance de preservacao acertar)
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let e = enemies[i];
+        if (!hit.has(e)) continue;
+        if (Math.random() < preserve) {                     // item preservado
+            if (e.chest) chests.push({ x: e.x, y: e.y, r: 16, grav: false });
+            else for (let d = 0; d < e.drops; d++) drops.push({ x: e.x + Math.random()*20 - 10, y: e.y + Math.random()*20 - 10, grav: false });
+        }
+        explosions.push({ x: e.x, y: e.y, r: 26, life: 1 });
+        enemies.splice(i, 1); kills++; spawnEnemy();
+    }
+    reacao.links = links; reacao.life = 320;
+    sndReacao();
+}
+function updateReacao(now, dt) {
+    let lv = upLevels["Reação em Cadeia"];
+    if (lv <= 0) return;
+    if (enemies.some(e => !e.isBoss) && now - reacao.last >= REACAO_CD) { reacao.last = now; fireReacao(); }
+    if (reacao.life > 0) reacao.life -= dt;
 }
 
 // Atualiza a habilidade do personagem ativo
@@ -674,6 +762,7 @@ function updateAbilities(now, dt) {
     }
     if (charAbility === "curie") { updatePotions(now); updateAcidZones(now); }
     updateReso(now, dt);
+    updateReacao(now, dt);
     for (let i = explosions.length - 1; i >= 0; i--) { explosions[i].life -= dt / 350; if (explosions[i].life <= 0) explosions.splice(i, 1); }
 }
 
@@ -743,7 +832,7 @@ function spawnEnemy() {
         vx: 0, vy: 0, 
         r: type.r, hp: type.hp, maxHp: type.hp, color: type.color,
         drops: type.drops, chest: type.chest, spdMult: type.spd,
-        hitOrbs: new Set(), slowUntil: 0
+        hitOrbs: new Set(), slowUntil: 0, stunUntil: 0, born: elapsedTime
     });
 }
 
@@ -807,17 +896,16 @@ function applyDamage(e, rawDmg) {
 // Remove um inimigo, gera drops/baus, conta abate e repoe a horda.
 function killEnemy(e, idx) {
     if (e.isBoss) {
-        // Boss derrotado: solta varios baus, marca conquista e libera Ressonancia Estrutural
+        // Boss derrotado: solta baus e abre a escolha do premio (Ressonancia ou Reacao)
         for (let k = 0; k < 4; k++) chests.push({x: e.x + Math.random()*40 - 20, y: e.y + Math.random()*40 - 20, r: 16, grav: false});
         explosions.push({ x: e.x, y: e.y, r: 120, life: 1 });
         boss = null;
         bossDefeated = true;
         enemies.splice(idx, 1);
         kills++;
-        sndReso();
-        checkUnlocks();
-        showToast("BOSS DERROTADO!");
+        sndBoss();
         spawnEnemy();
+        showBossReward();
         return;
     }
     if (e.chest) chests.push({x: e.x, y: e.y, r: 16, grav: false});
@@ -852,11 +940,12 @@ function showLevel() {
         if(upLevels[u] >= 5) return false;
         if(u === "Velocidade das orbes" && targetOrbs() < 5) return false;
         if(u === "Habilidade" && charAbility === "none") return false;   // Padrao nao tem habilidade
-        // Armas liberadas por conquistas
-        if(u === "Lançadora de maçãs" && !isUnlocked("maca")) return false;
-        if(u === "Prisma de Luz" && !isUnlocked("prisma")) return false;
-        if(u === "Gaiola de Faraday" && !isUnlocked("faraday")) return false;
-        if(u === "Ressonância Estrutural" && !isUnlocked("ressonancia")) return false;
+        // Armas liberadas por conquistas: so entram na partida POSTERIOR (snapshot fixado no inicio)
+        if(u === "Lançadora de maçãs" && !isActive("maca")) return false;
+        if(u === "Prisma de Luz" && !isActive("prisma")) return false;
+        if(u === "Gaiola de Faraday" && !isActive("faraday")) return false;
+        if(u === "Ressonância Estrutural" && !isActive("ressonancia")) return false;
+        if(u === "Reação em Cadeia" && !isActive("reacao")) return false;
         return true;
     });
 
@@ -886,6 +975,9 @@ function showLevel() {
             else extraText = ` (recarga ${PRISM_CD[upLevels[u]] / 1000}s)`;
         } else if (u === "Ressonância Estrutural") {
             extraText = upLevels[u] === 0 ? " (Nova - canaliza 3s, recarga 40s)" : ` (recarga ${RESO_CD[upLevels[u]] / 1000}s)`;
+        } else if (u === "Reação em Cadeia") {
+            let ch = Math.round(REACAO_PRESERVE[Math.min(upLevels[u], 4)] * 100);
+            extraText = upLevels[u] === 0 ? " (Nova - recarga 45s, preserva item 5%)" : ` (preserva item ${ch}%)`;
         }
 
         b.textContent = (u === "Habilidade")
@@ -921,7 +1013,7 @@ base.ontouchend = () => { joy.a = false; joy.dx = joy.dy = 0; stick.style.transf
 
 function upd() {
     let real = performance.now();
-    let dt = real - lastTime;
+    let dt = Math.min(64, real - lastTime);   // tempo REAL (relogio e marcos por tempo normais)
     lastTime = real;
     
     if(paused) return;          // pausado: relogio de jogo congela (cooldowns nao avancam)
@@ -968,7 +1060,7 @@ function upd() {
 
     p.vx += inputX * p.spd; p.vy += inputY * p.spd;
     p.vx *= 1 - world.f; p.vy *= 1 - world.f;
-    p.x += p.vx; p.y += p.vy;
+    p.x += p.vx * GAME_SPEED; p.y += p.vy * GAME_SPEED;
     p.x = Math.max(p.r, Math.min(world.w - p.r, p.x));
     p.y = Math.max(p.r, Math.min(world.h - p.r, p.y));
     
@@ -979,7 +1071,7 @@ function upd() {
                 x: p.x + (Math.random() - 0.5) * 2000, 
                 y: p.y + (Math.random() - 0.5) * 2000,
                 vx: 0, vy: 0, r: 14, hp: 20, maxHp: 20, color: "#f1c40f", drops: 1, chest: false, spdMult: 1.1,
-                hitOrbs: new Set(), slowUntil: 0
+                hitOrbs: new Set(), slowUntil: 0, stunUntil: 0, born: elapsedTime
             });
         }
     }
@@ -988,13 +1080,19 @@ function upd() {
     if (!bossSpawned && elapsedTime >= BOSS_TIME) {
         bossSpawned = true;
         let sp = spawnPos();
-        boss = { x: sp.x, y: sp.y, vx: 0, vy: 0, r: 58, hp: 3000, maxHp: 3000, color: "#ff3b6b", drops: 6, chest: false, spdMult: 0.4, hitOrbs: new Set(), slowUntil: 0, isBoss: true };
+        boss = { x: sp.x, y: sp.y, vx: 0, vy: 0, r: 58, hp: 3000, maxHp: 3000, color: "#ff3b6b", drops: 6, chest: false, spdMult: 0.4, hitOrbs: new Set(), slowUntil: 0, stunUntil: 0, born: elapsedTime, isBoss: true };
         enemies.push(boss);
         sndBoss();
         showToast("O BOSS APARECEU!");
     }
 
-    baseOrbAngle += p.orbSpeed;
+    // Inimigos somem apos no maximo 2 min no mapa (recicla para nao esvaziar)
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let e = enemies[i];
+        if (!e.isBoss && now - e.born >= ENEMY_MAX_LIFE) { enemies.splice(i, 1); spawnEnemy(); }
+    }
+
+    baseOrbAngle += p.orbSpeed * GAME_SPEED;
     
     orbs.forEach((o, idx) => {
         o.a = baseOrbAngle + (idx * (Math.PI * 2) / orbs.length);
@@ -1047,7 +1145,7 @@ function upd() {
 
     for(let i=apples.length-1; i>=0; i--) {
         let a = apples[i];
-        a.x += a.vx; a.y += a.vy;
+        a.x += a.vx * GAME_SPEED; a.y += a.vy * GAME_SPEED;
 
         let minX = cam.x, maxX = cam.x + viewW;
         let minY = cam.y, maxY = cam.y + viewH;
@@ -1101,6 +1199,7 @@ function upd() {
             } else {
                 for (let i = enemies.length - 1; i >= 0; i--) {
                     let e = enemies[i];
+                    if (e.isBoss) continue;                       // chefe imune ao abate instantaneo
                     if (faraday.safe.has(e)) continue;            // estava dentro: nao sofre dano
                     if (Math.hypot(e.x - p.x, e.y - p.y) <= faraday.r) {
                         zaps.push({x: e.x, y: e.y, life: 1});     // faisca de abate
@@ -1128,7 +1227,7 @@ function upd() {
         if (prism.active) {
             let speed = (Math.PI * 2) / 420;                     // varredura completa em ~420ms
             let prev = prism.angle;
-            prism.angle += prism.dir * speed * dt;
+            prism.angle += prism.dir * speed * dt * GAME_SPEED;
             let lo = Math.min(prev, prism.angle), hi = Math.max(prev, prism.angle);
             for (let i = enemies.length - 1; i >= 0; i--) {
                 let e = enemies[i];
@@ -1203,8 +1302,9 @@ function upd() {
         }
 
         let dxP = p.x - e1.x, dyP = p.y - e1.y, dP = Math.max(1, Math.hypot(dxP, dyP));
+        let immobile = frozen || now < e1.stunUntil;   // Einstein (global) ou Tesla (paralisia 0,5s)
 
-        if (!frozen) {
+        if (!immobile) {
             let isSlowed = now < e1.slowUntil;
             let speedPenalty = isSlowed ? 0.3 : 1.0; 
             e1.vx += (dxP/dP) * .02 * e1.spdMult * globalSpeedMult * speedPenalty;
@@ -1213,7 +1313,7 @@ function upd() {
             e1.vy *= .98;
         }
         
-        if(dP < e1.r + p.r && !frozen){     // durante a paralisia o jogador atravessa (intangivel)
+        if(dP < e1.r + p.r && !frozen){     // durante a paralisia do Einstein o jogador atravessa (intangivel)
             let o = e1.r + p.r - dP, nxP = dxP/dP, nyP = dyP/dP;
             p.x += nxP * o * .5; p.y += nyP * o * .5;
             e1.x -= nxP * o * .5; e1.y -= nyP * o * .5;
@@ -1222,7 +1322,7 @@ function upd() {
             sndHurt();
         }
         
-        if (!frozen) { e1.x += e1.vx; e1.y += e1.vy; }
+        if (!immobile) { e1.x += e1.vx * GAME_SPEED; e1.y += e1.vy * GAME_SPEED; }
     }
 
     for(let i=drops.length-1; i>=0; i--){
@@ -1392,7 +1492,7 @@ function draw() {
             // barra exposta sempre visivel, maior, acima do boss
             bar(e.x - e.r, e.y - e.r - 14, e.r * 2, 8, e.hp / e.maxHp, "#ff3b6b", "#3a0d18");
         } else {
-            ctx.fillStyle = frozenNow ? "#9fb6ff" : ((elapsedTime < e.slowUntil) ? "#e0e0e0" : e.color);
+            ctx.fillStyle = frozenNow ? "#9fb6ff" : (elapsedTime < e.stunUntil ? "#bfefff" : ((elapsedTime < e.slowUntil) ? "#e0e0e0" : e.color));
             ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 6.28); ctx.fill();
             if (e.hp < e.maxHp) bar(e.x - e.r, e.y - e.r - 8, e.r * 2, 4, e.hp/e.maxHp, "#f55", "#400");  // barra so se ferido
         }
@@ -1447,6 +1547,20 @@ function draw() {
             ctx.lineWidth = 1.4;
             ctx.stroke();
         });
+    }
+
+    // Reacao em Cadeia (particula que se divide em arvore)
+    if (reacao.life > 0 && reacao.links.length) {
+        let a = Math.max(0, Math.min(1, reacao.life / 320));
+        for (let i = 0; i < reacao.links.length; i++) {
+            let L = reacao.links[i];
+            ctx.strokeStyle = "rgba(120,230,255," + a.toFixed(2) + ")";
+            ctx.lineWidth = 2.4; ctx.lineCap = "round";
+            ctx.beginPath(); ctx.moveTo(L.x1, L.y1); ctx.lineTo(L.x2, L.y2); ctx.stroke();
+            ctx.fillStyle = "rgba(255,255,255," + a.toFixed(2) + ")";
+            ctx.beginPath(); ctx.arc(L.x2, L.y2, 3, 0, 6.28); ctx.fill();
+        }
+        ctx.lineCap = "butt";
     }
 
     // ===== Gaiola de Faraday (anel eletrico) =====
@@ -1685,10 +1799,17 @@ function renderCollectibles() {
             : `<span class="colIco">?</span><span class="colName">${a.cond}${prog}</span><span class="colFact">${a.reward}</span>`;
         collectGrid.appendChild(card);
     });
-}
-
-function snapshot() {
-    return { kills: lifetimeBase + kills, time: elapsedTime / 1000, lv: p.lv, chests: chestsOpened, boss: bossDefeated };
+    // Linha extra: recompensa do Boss (escolha entre Ressonancia e Reacao)
+    let rew = [];
+    if (unlocks.has("ressonancia")) rew.push("Ressonância Estrutural");
+    if (unlocks.has("reacao")) rew.push("Reação em Cadeia");
+    let bossGot = rew.length > 0;
+    let bc = document.createElement("div");
+    bc.className = "colCard" + (bossGot ? " got" : "");
+    bc.innerHTML = bossGot
+        ? `<span class="colIco">✦</span><span class="colName">Caçador de Boss</span><span class="colFact">Liberado: ${rew.join(" + ")}</span>`
+        : `<span class="colIco">?</span><span class="colName">Derrote o Boss (5 min)</span><span class="colFact">Escolha: Ressonância ou Reação em Cadeia</span>`;
+    collectGrid.appendChild(bc);
 }
 function checkUnlocks() {
     let st = snapshot();
@@ -1712,6 +1833,7 @@ function showToast(text) {
 
 function startGame() {
     unlockAudio();
+    activeUnlocks = new Set(unlocks);    // fixa o que vale nesta partida (liberacoes valem so na proxima)
     // se o personagem selecionado estiver bloqueado, volta para o Padrao
     if (CHARS[selectedChar].req !== null && !isUnlocked(CHARS[selectedChar].req)) selectedChar = 0;
     CHARS[selectedChar].apply();         // aplica o bonus do personagem
@@ -1763,6 +1885,22 @@ function continueAfterWin() {
     lastTime = performance.now();
 }
 
+// Premio do boss: escolha entre Ressonancia Estrutural e Reacao em Cadeia (vale na proxima partida)
+function showBossReward() {
+    bossRewardPending = true;
+    paused = true;
+    document.getElementById("bossReward").style.display = "flex";
+}
+function chooseBossReward(id) {
+    unlocks.add(id);
+    saveSet("ez_ach", unlocks);
+    document.getElementById("bossReward").style.display = "none";
+    bossRewardPending = false;
+    paused = false;
+    lastTime = performance.now();        // evita salto de tempo
+    showToast((id === "ressonancia" ? "Ressonância Estrutural" : "Reação em Cadeia") + " liberada (próxima partida)");
+}
+
 function renderRecords() {
     let el = document.getElementById("recordList");
     if (!el) return;
@@ -1779,6 +1917,8 @@ document.getElementById("btnPlatform").onclick = goToPlatform;
 document.querySelectorAll(".btnBack").forEach(b => b.onclick = () => showScreen("start"));
 document.getElementById("btnContinue").onclick = continueAfterWin;
 document.getElementById("btnWinMenu").onclick   = () => location.reload();
+document.getElementById("btnRewReso").onclick   = () => chooseBossReward("ressonancia");
+document.getElementById("btnRewReacao").onclick = () => chooseBossReward("reacao");
 
 renderRecords();
 document.body.classList.add("menu-open");
