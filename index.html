@@ -1811,6 +1811,9 @@ function renderCollectibles() {
         : `<span class="colIco">?</span><span class="colName">Derrote o Boss (5 min)</span><span class="colFact">Escolha: Ressonância ou Reação em Cadeia</span>`;
     collectGrid.appendChild(bc);
 }
+function snapshot() {
+    return { kills: lifetimeBase + kills, time: elapsedTime / 1000, lv: p.lv, chests: chestsOpened, boss: bossDefeated };
+}
 function checkUnlocks() {
     let st = snapshot();
     ACHIEVEMENTS.forEach(a => {
