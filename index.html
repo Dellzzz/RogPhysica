@@ -82,6 +82,10 @@
         #muteBtn.muted{border-color:rgba(255,90,90,.5)}
         #muteBtn.muted .wave{display:none}
         #muteBtn.muted .slash{display:block}
+        #pauseBtn{position:fixed;top:calc(env(safe-area-inset-top,0px) + 104px);right:56px;width:38px;height:38px;border:1px solid rgba(57,213,255,.3);border-radius:10px;background:rgba(10,18,28,.78);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;pointer-events:auto;z-index:4;cursor:pointer;transition:transform .08s}
+        #pauseBtn:active{transform:scale(.92)}
+        #pauseBtn svg{width:20px;height:20px}
+        #pauseScreen{display:none;position:fixed;inset:0;z-index:13;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center;color:#eaf6ff;background:radial-gradient(circle at 50% 35%,rgba(13,24,37,.94),rgba(5,10,16,.98));backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 
         /* ===================== Level up / Game over ===================== */
         #level{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.72);z-index:5;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
@@ -96,7 +100,7 @@
         #gameOver button{font-family:'Orbitron',system-ui;padding:15px 32px;font-size:18px;background:linear-gradient(90deg,#39d5ff,#7fe9ff);border:none;border-radius:12px;color:#071018;font-weight:700;letter-spacing:1px;cursor:pointer;box-shadow:0 0 24px rgba(57,213,255,.5)}
 
         /* ===================== Menu inicial ===================== */
-        body.menu-open #hud, body.menu-open #controls, body.menu-open #autoWeps, body.menu-open #muteBtn{display:none}
+        body.menu-open #hud, body.menu-open #controls, body.menu-open #autoWeps, body.menu-open #muteBtn, body.menu-open #pauseBtn{display:none}
         .screen{position:fixed;inset:0;z-index:12;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:radial-gradient(circle at 50% 30%,rgba(13,28,44,.86),rgba(5,10,16,.95));backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:#eaf6ff;overflow-y:auto}
         .brand{font-family:'Orbitron',system-ui;font-weight:800;font-size:34px;letter-spacing:3px;text-align:center;color:#fff;text-shadow:0 0 26px rgba(57,213,255,.55);line-height:1.05}
         .brand .sub{display:block;font-size:13px;letter-spacing:5px;font-weight:600;color:#7fe9ff;margin-top:6px}
@@ -217,6 +221,22 @@
             <line class="slash" x1="15" y1="5" x2="21" y2="19" stroke="#ff5a5a" stroke-width="2" stroke-linecap="round"/>
         </svg>
     </button>
+
+    <button id="pauseBtn" aria-label="Pausar">
+        <svg viewBox="0 0 24 24" fill="none">
+            <rect x="7" y="5" width="3.5" height="14" rx="1.2" fill="#7fe9ff"/>
+            <rect x="13.5" y="5" width="3.5" height="14" rx="1.2" fill="#7fe9ff"/>
+        </svg>
+    </button>
+
+    <div id="pauseScreen">
+        <h1 class="winTitle">PAUSADO</h1>
+        <div class="winBtns">
+            <button id="btnResume" class="winBtn primary">Retomar</button>
+            <button id="btnReset" class="winBtn ghost">Resetar</button>
+            <button id="btnPauseMenu" class="winBtn ghost">Voltar para Menu</button>
+        </div>
+    </div>
     
     <div id="level">
         <div id="card">
@@ -1952,6 +1972,22 @@ function chooseBossReward(id) {
     showToast((id === "ressonancia" ? "Ressonância Estrutural" : "Reação em Cadeia") + " liberada (próxima partida)");
 }
 
+// Pausa manual: so quando o jogo esta rodando (nao no menu, level-up, vitoria, etc.)
+function openPause() {
+    if (!gameStarted || paused || won || p.dead || bossRewardPending) return;
+    paused = true;
+    document.getElementById("pauseScreen").style.display = "flex";
+}
+function resumeGame() {
+    document.getElementById("pauseScreen").style.display = "none";
+    paused = false;
+    lastTime = performance.now();        // evita salto de tempo
+}
+function resetRun() {
+    try { sessionStorage.setItem("ez_autostart", "1"); } catch (e) {}   // reinicia direto na proxima carga
+    location.reload();
+}
+
 function renderRecords() {
     let el = document.getElementById("recordList");
     if (!el) return;
@@ -1970,10 +2006,17 @@ document.getElementById("btnContinue").onclick = continueAfterWin;
 document.getElementById("btnWinMenu").onclick   = () => location.reload();
 document.getElementById("btnRewReso").onclick   = () => chooseBossReward("ressonancia");
 document.getElementById("btnRewReacao").onclick = () => chooseBossReward("reacao");
+document.getElementById("pauseBtn").onclick     = openPause;
+document.getElementById("btnResume").onclick    = resumeGame;
+document.getElementById("btnReset").onclick     = resetRun;
+document.getElementById("btnPauseMenu").onclick = () => location.reload();
 
 renderRecords();
 document.body.classList.add("menu-open");
 showScreen("start");
+
+// Resetar (botao de pausa) recarrega e cai direto numa nova partida com o mesmo personagem
+try { if (sessionStorage.getItem("ez_autostart")) { sessionStorage.removeItem("ez_autostart"); startGame(); } } catch (e) {}
 
 (function loop() {
     upd();
