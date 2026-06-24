@@ -94,7 +94,7 @@
         .opt{width:100%;padding:13px 14px;margin-top:10px;background:linear-gradient(90deg,rgba(23,48,64,.9),rgba(18,36,52,.9));border:1px solid rgba(57,213,255,.18);border-radius:11px;color:#fff;text-align:left;font-family:'Rajdhani',system-ui;font-weight:600;font-size:15px;cursor:pointer;transition:background .15s,border-color .15s,transform .08s}
         .opt:active{transform:scale(.98)}
         .opt:hover{background:linear-gradient(90deg,rgba(30,62,82,.95),rgba(23,46,66,.95));border-color:rgba(57,213,255,.45)}
-        #gameOver{display:none;position:fixed;inset:0;background:rgba(0,0,0,.86);z-index:10;align-items:center;justify-content:center;flex-direction:column;color:#fff}
+        #gameOver{display:none;position:fixed;inset:0;background:rgba(0,0,0,.86);z-index:10;align-items:center;justify-content:center;flex-direction:column;color:#fff;padding:24px;overflow-y:auto;-webkit-overflow-scrolling:touch}
         #gameOver h1{font-family:'Orbitron',system-ui;color:#ff4757;font-size:46px;margin-bottom:10px;text-transform:uppercase;letter-spacing:2px;text-shadow:0 0 24px rgba(255,71,87,.5)}
         #finalTime{font-family:'Rajdhani',system-ui;font-size:22px;margin-bottom:24px;color:#cfe0ec}
         #gameOver button{font-family:'Orbitron',system-ui;padding:15px 32px;font-size:18px;background:linear-gradient(90deg,#39d5ff,#7fe9ff);border:none;border-radius:12px;color:#071018;font-weight:700;letter-spacing:1px;cursor:pointer;box-shadow:0 0 24px rgba(57,213,255,.5)}
@@ -137,7 +137,7 @@
         #toast.show{opacity:1;transform:translate(-50%,0)}
 
         /* Tela de vitoria */
-        #winScreen{display:none;position:fixed;inset:0;z-index:11;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center;color:#eaf6ff;background:radial-gradient(circle at 50% 35%,rgba(20,42,60,.92),rgba(5,10,16,.97));backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+        #winScreen{display:none;position:fixed;inset:0;z-index:11;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center;color:#eaf6ff;background:radial-gradient(circle at 50% 35%,rgba(20,42,60,.92),rgba(5,10,16,.97));backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);overflow-y:auto;-webkit-overflow-scrolling:touch}
         #bossReward{display:none;position:fixed;inset:0;z-index:12;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;color:#eaf6ff;background:radial-gradient(circle at 50% 35%,rgba(60,16,30,.94),rgba(8,5,10,.97));backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
         .rewardGrid{display:flex;flex-direction:column;gap:14px;width:min(88vw,420px);margin-top:6px}
         .rewardCard{display:flex;flex-direction:column;gap:6px;text-align:left;padding:16px 18px;border-radius:14px;cursor:pointer;background:linear-gradient(180deg,rgba(20,42,60,.6),rgba(10,20,30,.6));border:1.5px solid rgba(127,233,255,.35);transition:transform .08s,border-color .12s}
@@ -145,6 +145,18 @@
         .rewardCard:hover{border-color:rgba(127,233,255,.8)}
         .rwName{font-family:'Orbitron',system-ui;font-weight:800;font-size:17px;letter-spacing:1px;color:#7fe9ff}
         .rwDesc{font-family:'Rajdhani',system-ui;font-weight:600;font-size:14px;line-height:1.35;color:#cfe6f5}
+        .report{width:min(90vw,440px);max-height:40vh;overflow-y:auto;margin:4px 0 14px;text-align:left;background:rgba(8,14,23,.5);border:1px solid rgba(57,213,255,.2);border-radius:12px;padding:12px 14px;-webkit-overflow-scrolling:touch}
+        .repHead{font-family:'Orbitron',system-ui;font-weight:800;font-size:13px;letter-spacing:1.5px;color:#7fe9ff;text-align:center;margin-bottom:8px}
+        .repStats{display:flex;justify-content:space-around;gap:8px;margin-bottom:6px}
+        .repStats div{display:flex;flex-direction:column;align-items:center;gap:2px}
+        .repStats span{font-size:11px;color:#9fb6c5;text-transform:uppercase;letter-spacing:.5px}
+        .repStats b{font-family:'Orbitron',system-ui;font-size:18px;color:#fff}
+        .repSec{margin-top:10px}
+        .repSec h3{font-size:12px;font-weight:700;color:#9fdcff;margin:0 0 5px;text-transform:uppercase;letter-spacing:.5px}
+        .repTags{display:flex;flex-wrap:wrap;gap:5px}
+        .repTag{font-family:'Rajdhani',system-ui;font-weight:600;font-size:13px;color:#dfeefc;background:rgba(57,213,255,.1);border:1px solid rgba(57,213,255,.22);border-radius:8px;padding:3px 8px}
+        .repTag b{color:#7fe9ff;font-weight:800}
+        .repEmpty{font-size:13px;color:#7d93a4;font-style:italic}
         .winTitle{font-family:'Orbitron',system-ui;font-weight:800;font-size:42px;letter-spacing:3px;color:#7fe9ff;text-shadow:0 0 28px rgba(57,213,255,.6);margin-bottom:14px}
         .winMsg{font-family:'Rajdhani',system-ui;font-weight:600;font-size:19px;line-height:1.4;max-width:440px;color:#dff0fb;margin-bottom:16px}
         #winStats{font-family:'Rajdhani',system-ui;font-size:16px;color:#bcd6e6;margin-bottom:10px}
@@ -249,6 +261,7 @@
         <h1>Você Morreu</h1>
         <p id="finalTime"></p>
         <div id="overRecord" class="recBadge">NOVO RECORDE! ★</div>
+        <div id="reportOver" class="report"></div>
         <button onclick="location.reload()">Tentar Novamente</button>
     </div>
 
@@ -257,6 +270,7 @@
         <p class="winMsg">Parabéns, você sobreviveu à desordem e restaurou a entropia!</p>
         <p id="winStats"></p>
         <div id="winRecord" class="recBadge">NOVO RECORDE! ★</div>
+        <div id="reportWin" class="report"></div>
         <div class="winBtns">
             <button id="btnContinue" class="winBtn primary">Continuar</button>
             <button id="btnWinMenu" class="winBtn ghost">Voltar para o menu</button>
@@ -289,6 +303,10 @@
                 <svg class="mIco" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="#7fe9ff" stroke-width="1.7"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" stroke="#7fe9ff" stroke-width="1.7"/></svg>
                 Personagens
             </button>
+            <button class="menuBtn" id="btnSkills">
+                <svg class="mIco" viewBox="0 0 24 24" fill="none"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" stroke="#7fe9ff" stroke-width="1.6" stroke-linejoin="round"/></svg>
+                Habilidades
+            </button>
             <button class="menuBtn" id="btnCollect">
                 <svg class="mIco" viewBox="0 0 24 24" fill="none"><path d="m12 3 2.6 5.6 6 .6-4.5 4 1.3 5.9L12 21l-5.4 3.1L8 18.2l-4.5-4 6-.6L12 3Z" stroke="#7fe9ff" stroke-width="1.5" stroke-linejoin="round"/></svg>
                 Conquistas
@@ -308,6 +326,13 @@
         <div class="screenTitle">PERSONAGENS</div>
         <div class="screenSub">Cada um tem uma cor e um bônus passivo.</div>
         <div class="charGrid" id="charGrid"></div>
+        <div class="menuBtns"><button class="menuBtn ghost btnBack">Voltar</button></div>
+    </div>
+
+    <div class="screen" id="skillsScreen">
+        <div class="screenTitle">HABILIDADES</div>
+        <div class="screenSub">Equipe uma habilidade. Elas são liberadas subindo níveis no total (acumula entre partidas).</div>
+        <div class="charGrid" id="skillGrid"></div>
         <div class="menuBtns"><button class="menuBtn ghost btnBack">Voltar</button></div>
     </div>
 
@@ -372,6 +397,33 @@ let playerColor = "#ffffff";
 let selectedChar = 0;
 let chestsOpened = 0;
 let won = false;            // venceu (chegou a 5 minutos)
+
+// Sistema de habilidade ativavel: equipa-se UMA no menu (botao de acao a aciona).
+// Cada uma e liberada ao subir um total de niveis somando as partidas (acumula mesmo apos a morte).
+const ACTIVE_ABILITIES = [
+    { id: "impulso",     name: "Impulso Cinético",        short: "DASH",  cd: 5000,  reqLevel: 10,  desc: "Dash de 65px e empurra todos os inimigos 30px." },
+    { id: "campo",       name: "Campo Eletrostático",     short: "CAMPO", cd: 15000, reqLevel: 50,  desc: "Inverte os polos: por 3s os inimigos são repelidos." },
+    { id: "gravidade",   name: "Gravidade",               short: "GRAV",  cd: 20000, reqLevel: 100, desc: "Repele os inimigos próximos e os deixa lentos." },
+    { id: "antimateria", name: "Armadura de Antimatéria", short: "ANTI",  cd: 30000, reqLevel: 200, desc: "5s: ao tocar inimigos, você cura e os destrói (chefe imune)." },
+    { id: "dilatacao",   name: "Dilatação Temporal",      short: "TEMPO", cd: 40000, reqLevel: 500, desc: "4s: inimigos congelam e você fica veloz; deixa um rastro que explode quem foi tocado." }
+];
+let selectedSkill = 0;      // padrao: a primeira (Impulso)
+try { let sk = parseInt(localStorage.getItem("ez_skill")); if (!isNaN(sk) && ACTIVE_ABILITIES[sk]) selectedSkill = sk; } catch (e) {}
+function saveSkill() { try { localStorage.setItem("ez_skill", String(selectedSkill)); } catch (e) {} }
+
+let totalLevels = 0;        // total de niveis subidos somando TODAS as partidas (libera as habilidades; acumula apos a morte)
+try { totalLevels = parseInt(localStorage.getItem("ez_totallevels")) || 0; } catch (e) {}
+function isSkillUnlocked(i) { return totalLevels >= ACTIVE_ABILITIES[i].reqLevel; }
+function saveTotalLevels() { try { localStorage.setItem("ez_totallevels", String(totalLevels)); } catch (e) {} }
+
+// Estado dos efeitos com duracao
+let repelUntil = 0;         // Campo Eletrostatico
+let antimatterUntil = 0;    // Armadura de Antimateria
+let dilationUntil = 0;      // Dilatacao Temporal
+let dilWasActive = false;   // detecta o fim da dilatacao para liberar a energia
+let dilationHit = new Set();// inimigos tocados pelo rastro da dilatacao (so eles levam dano)
+let dilationTrail = [];     // pontos do rastro (visual + colisao)
+const dashFx = { x0: 0, y0: 0, x1: 0, y1: 0, life: 0 };   // rastro do Impulso Cinetico
 
 // Recordes salvos em localStorage (melhor tempo, abates e nivel)
 function loadRecords() {
@@ -663,6 +715,7 @@ function fireCurie() {
 function updatePotions(now) {
     for (let i = potions.length - 1; i >= 0; i--) {
         let po = potions[i];
+        if (elapsedTime < dilationUntil) continue;   // Dilatacao: projetil congela
         po.x += po.vx * GAME_SPEED; po.y += po.vy * GAME_SPEED; po.dist += 6 * GAME_SPEED;
         let hit = false;
         for (let j = 0; j < enemies.length; j++) {
@@ -825,7 +878,7 @@ addEventListener("keydown", e => {
     if(e.key in keys) keys[e.key] = true;
     if(e.code === "Space") {
         e.preventDefault();
-        useGravSkill();
+        useActiveSkill();
     }
 });
 addEventListener("keyup", e => {
@@ -891,30 +944,69 @@ function sync() {
 }
 sync();
 
-const skill = {cd: 20000, last: -20000}; 
+const skill = {cd: 20000, last: -20000};   // cd e definido em startGame conforme a habilidade equipada
 
-function useGravSkill() {
+// Botao de acao: aciona a habilidade equipada (respeitando o cooldown e o desbloqueio por nivel)
+function useActiveSkill() {
+    if (!isSkillUnlocked(selectedSkill)) return;   // ainda nao liberada (nivel insuficiente)
     let n = elapsedTime;                 // relogio de jogo
-    if(n - skill.last < skill.cd) return;
+    if (n - skill.last < skill.cd) return;
     skill.last = n;
-    
+    let id = ACTIVE_ABILITIES[selectedSkill].id;
+    if (id === "impulso")          doImpulso(n);
+    else if (id === "campo")       { repelUntil = n + 3000; sndGrav(); }
+    else if (id === "gravidade")   doGravity();
+    else if (id === "antimateria") { antimatterUntil = n + 5000; sndGrav(); }
+    else if (id === "dilatacao")   { dilationUntil = n + 4000; dilWasActive = true; dilationHit = new Set(); dilationTrail = []; sndGrav(); }
+}
+
+// Habilidade 1: dash de 65px na direcao do movimento, empurra todos os inimigos 30px
+function doImpulso(n) {
+    sndGrav();
+    let a = p.lastAngle;
+    dashFx.x0 = p.x; dashFx.y0 = p.y;
+    p.x = Math.max(p.r, Math.min(world.w - p.r, p.x + Math.cos(a) * 65));
+    p.y = Math.max(p.r, Math.min(world.h - p.r, p.y + Math.sin(a) * 65));
+    dashFx.x1 = p.x; dashFx.y1 = p.y; dashFx.life = 1;
+    enemies.forEach(e => {
+        let dx = e.x - p.x, dy = e.y - p.y, d = Math.hypot(dx, dy) || 1;
+        e.x += (dx / d) * 30; e.y += (dy / d) * 30;
+    });
+}
+
+// Habilidade 3: Gravidade (repele os proximos e os deixa lentos) - a original
+function doGravity() {
     sndGrav();
     visualGravRadius = 250;
-    
     drops.forEach(d => d.grav = true);
     chests.forEach(c => c.grav = true);
-
     enemies.forEach(e => {
         let dx = e.x - p.x, dy = e.y - p.y;
         let dist = Math.hypot(dx, dy) || 1;
-        if(dist < 250) { 
-            e.x += (dx/dist) * 100;
-            e.y += (dy/dist) * 100;
-            e.slowUntil = elapsedTime + 1000; 
+        if (dist < 250) {
+            e.x += (dx / dist) * 100;
+            e.y += (dy / dist) * 100;
+            e.slowUntil = elapsedTime + 1000;
         }
     });
 }
-gravBtn.onclick = useGravSkill;
+
+// Habilidade 5: fim da Dilatacao Temporal -> a energia acumulada explode SO quem o rastro tocou
+function releaseDilation() {
+    let any = false;
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let e = enemies[i];
+        if (!dilationHit.has(e)) continue;        // so inimigos atingidos pelo rastro
+        any = true;
+        explosions.push({ x: e.x, y: e.y, r: 40, life: 1 });
+        applyDamage(e, e.isBoss ? 220 : 100);     // rajada simultanea (chefe leva dano, sem abate instantaneo)
+        if (!e.isBoss && e.hp <= 0) killEnemy(e, i);
+    }
+    if (any) sndReso();
+    dilationHit = new Set();
+    dilationTrail = [];
+}
+gravBtn.onclick = useActiveSkill;
 
 const muteBtn = document.getElementById("muteBtn");
 muteBtn.onclick = () => {
@@ -971,6 +1063,8 @@ function gain(v) {
     while(p.xp >= p.next) {
         p.xp -= p.next;
         p.lv++;
+        totalLevels++;
+        checkSkillUnlock();
         p.next = xpForNext(p.lv);
         sndLevel();
         sync();
@@ -1076,6 +1170,11 @@ function upd() {
     elapsedTime += dt;
     let now = elapsedTime;      // RELOGIO DE JOGO: base de todos os cooldowns (some durante a pausa)
 
+    // Dilatacao Temporal: ao terminar, libera toda a energia acumulada nos inimigos
+    let dilActive = now < dilationUntil;
+    if (dilWasActive && !dilActive) releaseDilation();
+    dilWasActive = dilActive;
+
     // Vitoria aos 5 minutos
     if (elapsedTime >= 300000 && !won && !p.dead) {
         won = true;
@@ -1093,11 +1192,14 @@ function upd() {
     }
 
     let skillRem = Math.max(0, skill.cd - (now - skill.last));
-    if (skillRem > 0) {
+    if (!isSkillUnlocked(selectedSkill)) {
+        gravBtn.textContent = "-";
+        gravBtn.style.opacity = "0.35";
+    } else if (skillRem > 0) {
         gravBtn.textContent = (skillRem / 1000).toFixed(1) + "s";
         gravBtn.style.opacity = "0.5";
     } else {
-        gravBtn.textContent = "GRAV";
+        gravBtn.textContent = ACTIVE_ABILITIES[selectedSkill].short;
         gravBtn.style.opacity = "1";
     }
 
@@ -1115,9 +1217,21 @@ function upd() {
 
     p.vx += inputX * p.spd; p.vy += inputY * p.spd;
     p.vx *= 1 - world.f; p.vy *= 1 - world.f;
-    p.x += p.vx * GAME_SPEED; p.y += p.vy * GAME_SPEED;
+    let dilMult = elapsedTime < dilationUntil ? 3.5 : 1;   // Dilatacao: jogador quase na velocidade da luz
+    p.x += p.vx * GAME_SPEED * dilMult; p.y += p.vy * GAME_SPEED * dilMult;
     p.x = Math.max(p.r, Math.min(world.w - p.r, p.x));
     p.y = Math.max(p.r, Math.min(world.h - p.r, p.y));
+
+    // Dilatacao: deixa um rastro por onde passou e marca quem ele tocou (so esses levam dano ao fim)
+    if (elapsedTime < dilationUntil) {
+        dilationTrail.push({ x: p.x, y: p.y });
+        if (dilationTrail.length > 60) dilationTrail.shift();
+        let mr = p.r + 30;                                  // largura do rastro
+        for (let i = 0; i < enemies.length; i++) {
+            let e = enemies[i], dx = e.x - p.x, dy = e.y - p.y;
+            if (dx * dx + dy * dy < (mr + e.r) * (mr + e.r)) dilationHit.add(e);
+        }
+    }
     
     if (elapsedTime >= nextHordeTime) {
         nextHordeTime += 15000;
@@ -1200,7 +1314,7 @@ function upd() {
 
     for(let i=apples.length-1; i>=0; i--) {
         let a = apples[i];
-        a.x += a.vx * GAME_SPEED; a.y += a.vy * GAME_SPEED;
+        if (elapsedTime >= dilationUntil) { a.x += a.vx * GAME_SPEED; a.y += a.vy * GAME_SPEED; }   // Dilatacao: projetil congela
 
         let minX = cam.x, maxX = cam.x + viewW;
         let minY = cam.y, maxY = cam.y + viewH;
@@ -1323,7 +1437,10 @@ function upd() {
         if (cell) cell.push(i); else grid.set(key, [i]);
     }
 
-    let frozen = now < timeStopUntil;   // Einstein: tempo dos inimigos parado
+    let frozen = now < timeStopUntil || now < dilationUntil;   // Einstein (paralisia) ou Dilatacao Temporal
+    let antiActive = now < antimatterUntil;                    // Armadura de Antimateria
+    let repelActive = now < repelUntil;                        // Campo Eletrostatico (polos invertidos)
+    let antiKill = [];
 
     for(let i=0; i<enemies.length; i++){
         let e1 = enemies[i];
@@ -1357,27 +1474,39 @@ function upd() {
         }
 
         let dxP = p.x - e1.x, dyP = p.y - e1.y, dP = Math.max(1, Math.hypot(dxP, dyP));
-        let immobile = frozen || now < e1.stunUntil;   // Einstein (global) ou Tesla (paralisia 0,5s)
+        let immobile = frozen || now < e1.stunUntil;   // congelado (Einstein/Dilatacao) ou paralisado (Tesla)
 
         if (!immobile) {
             let isSlowed = now < e1.slowUntil;
             let speedPenalty = isSlowed ? 0.3 : 1.0; 
-            e1.vx += (dxP/dP) * .02 * e1.spdMult * globalSpeedMult * speedPenalty;
-            e1.vy += (dyP/dP) * .02 * e1.spdMult * globalSpeedMult * speedPenalty;
+            let dir = repelActive ? -1.4 : 1;          // Campo Eletrostatico: inverte e repele (um pouco mais forte)
+            e1.vx += dir * (dxP/dP) * .02 * e1.spdMult * globalSpeedMult * speedPenalty;
+            e1.vy += dir * (dyP/dP) * .02 * e1.spdMult * globalSpeedMult * speedPenalty;
             e1.vx *= .98;
             e1.vy *= .98;
         }
         
-        if(dP < e1.r + p.r && !frozen){     // durante a paralisia do Einstein o jogador atravessa (intangivel)
-            let o = e1.r + p.r - dP, nxP = dxP/dP, nyP = dyP/dP;
-            p.x += nxP * o * .5; p.y += nyP * o * .5;
-            e1.x -= nxP * o * .5; e1.y -= nyP * o * .5;
-            p.hp = Math.max(0, p.hp - (e1.isBoss ? 0.6 : 0.15));
-            hurtFlash = Math.min(0.85, hurtFlash + (e1.isBoss ? 0.25 : 0.10));
-            sndHurt();
+        if(dP < e1.r + p.r && !frozen){     // congelado (Dilatacao/Einstein): jogador atravessa (intangivel)
+            if (antiActive) {
+                // Armadura de Antimateria: cura e destroi os normais; chefe imune (so empurra)
+                if (!e1.isBoss) { antiKill.push(e1); p.hp = Math.min(p.maxHp, p.hp + 1); }
+                else { let o = e1.r + p.r - dP, nx = dxP/dP, ny = dyP/dP; p.x += nx*o*.5; p.y += ny*o*.5; e1.x -= nx*o*.5; e1.y -= ny*o*.5; }
+            } else {
+                let o = e1.r + p.r - dP, nxP = dxP/dP, nyP = dyP/dP;
+                p.x += nxP * o * .5; p.y += nyP * o * .5;
+                e1.x -= nxP * o * .5; e1.y -= nyP * o * .5;
+                p.hp = Math.max(0, p.hp - (e1.isBoss ? 0.6 : 0.15));
+                hurtFlash = Math.min(0.85, hurtFlash + (e1.isBoss ? 0.25 : 0.10));
+                sndHurt();
+            }
         }
         
         if (!immobile) { e1.x += e1.vx * GAME_SPEED; e1.y += e1.vy * GAME_SPEED; }
+    }
+    // Antimateria: destroi os inimigos tocados depois do loop (para nao baguncar os indices)
+    for (let k = antiKill.length - 1; k >= 0; k--) {
+        let e = antiKill[k], ix = enemies.indexOf(e);
+        if (ix >= 0) { explosions.push({ x: e.x, y: e.y, r: 24, life: 1 }); killEnemy(e, ix); }
     }
 
     for(let i=drops.length-1; i>=0; i--){
@@ -1393,6 +1522,8 @@ function upd() {
             chests.splice(i,1); 
             chestsOpened++;
             p.lv++;
+            totalLevels++;
+            checkSkillUnlock();
             p.next = xpForNext(p.lv);
             sndChest();
             sync();
@@ -1544,7 +1675,7 @@ function draw() {
         ctx.fillRect(c.x - 3, c.y - 2, 6, 4);
     });
     
-    let frozenNow = elapsedTime < timeStopUntil;
+    let frozenNow = elapsedTime < timeStopUntil || elapsedTime < dilationUntil;
     enemies.forEach(e=>{
         let cullM = e.isBoss ? 80 : 40;
         if(e.x<vx0-cullM||e.x>vx1+cullM||e.y<vy0-cullM||e.y>vy1+cullM) return;   // fora da tela: nao desenha
@@ -1704,6 +1835,57 @@ function draw() {
         visualGravRadius -= 8;
     }
 
+    // Impulso Cinetico: rastro do dash
+    if (dashFx.life > 0) {
+        ctx.strokeStyle = `rgba(160,225,255,${dashFx.life.toFixed(2)})`;
+        ctx.lineWidth = 6; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(dashFx.x0, dashFx.y0); ctx.lineTo(dashFx.x1, dashFx.y1); ctx.stroke();
+        ctx.lineCap = "butt";
+        dashFx.life -= 0.06;
+    }
+    // Campo Eletrostatico: anel eletrico repelindo
+    if (elapsedTime < repelUntil) {
+        let pn = performance.now();
+        ctx.strokeStyle = `rgba(120,200,255,${(0.5 + 0.3 * Math.sin(pn / 60)).toFixed(2)})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 72 + 6 * Math.sin(pn / 80), 0, 6.28); ctx.stroke();
+        ctx.strokeStyle = "rgba(120,200,255,0.22)";
+        ctx.lineWidth = 14;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 72, 0, 6.28); ctx.stroke();
+    }
+    // Armadura de Antimateria: aura violeta ao redor do jogador
+    if (elapsedTime < antimatterUntil) {
+        let pn = performance.now(), ar = p.r + 12 + 3 * Math.sin(pn / 90);
+        let grd = ctx.createRadialGradient(p.x, p.y, p.r, p.x, p.y, ar + 16);
+        grd.addColorStop(0, "rgba(200,120,255,0.45)");
+        grd.addColorStop(1, "rgba(200,120,255,0)");
+        ctx.fillStyle = grd;
+        ctx.beginPath(); ctx.arc(p.x, p.y, ar + 16, 0, 6.28); ctx.fill();
+        ctx.strokeStyle = "rgba(230,180,255,0.9)";
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(p.x, p.y, ar, 0, 6.28); ctx.stroke();
+    }
+    // Dilatacao Temporal: rastro luminoso por onde o jogador passou
+    if (elapsedTime < dilationUntil && dilationTrail.length > 1) {
+        ctx.save();
+        ctx.lineCap = "round"; ctx.lineJoin = "round";
+        ctx.shadowBlur = 16; ctx.shadowColor = "#bfe6ff";
+        ctx.strokeStyle = "rgba(190,225,255,0.30)";
+        ctx.lineWidth = (p.r + 30) * 2;
+        ctx.beginPath();
+        ctx.moveTo(dilationTrail[0].x, dilationTrail[0].y);
+        for (let i = 1; i < dilationTrail.length; i++) ctx.lineTo(dilationTrail[i].x, dilationTrail[i].y);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = "rgba(255,255,255,0.85)";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(dilationTrail[0].x, dilationTrail[0].y);
+        for (let i = 1; i < dilationTrail.length; i++) ctx.lineTo(dilationTrail[i].x, dilationTrail[i].y);
+        ctx.stroke();
+        ctx.restore();
+    }
+
     // Aura de calor do Joule (ao redor do jogador) - raio cresce com o nivel
     if (charAbility === "joule") {
         let JR = jouleParams().R;
@@ -1789,6 +1971,11 @@ function draw() {
         ctx.fillStyle = "rgba(80,120,255,0.10)";
         ctx.fillRect(0, 0, innerWidth, innerHeight);
     }
+    // Tint claro durante a Dilatacao Temporal (quase velocidade da luz)
+    if (elapsedTime < dilationUntil) {
+        ctx.fillStyle = "rgba(180,220,255,0.12)";
+        ctx.fillRect(0, 0, innerWidth, innerHeight);
+    }
 
     // Flash vermelho ao tomar dano (vinheta em espaco de tela)
     if (hurtFlash > 0.01) {
@@ -1817,12 +2004,15 @@ const startMenu = document.getElementById("startMenu"),
       charsScreen = document.getElementById("charsScreen"),
       collectScreen = document.getElementById("collectScreen"),
       charGrid = document.getElementById("charGrid"),
+      skillsScreen = document.getElementById("skillsScreen"),
+      skillGrid = document.getElementById("skillGrid"),
       collectGrid = document.getElementById("collectGrid"),
       toastEl = document.getElementById("toast");
 
 function showScreen(name) {
     startMenu.style.display    = name === "start"    ? "flex" : "none";
     charsScreen.style.display  = name === "chars"    ? "flex" : "none";
+    skillsScreen.style.display = name === "skills"   ? "flex" : "none";
     collectScreen.style.display= name === "collect"  ? "flex" : "none";
 }
 
@@ -1849,6 +2039,24 @@ function renderChars() {
     });
 }
 function saveChar() { try { localStorage.setItem("ez_char", String(selectedChar)); } catch (e) {} }
+
+function renderSkills() {
+    skillGrid.innerHTML = "";
+    ACTIVE_ABILITIES.forEach((ab, i) => {
+        let locked = !isSkillUnlocked(i);
+        let card = document.createElement("button");
+        card.className = "charCard" + (i === selectedSkill && !locked ? " sel" : "") + (locked ? " locked" : "");
+        let info = locked
+            ? `Bloqueada - suba ${ab.reqLevel} níveis no total (${Math.min(totalLevels, ab.reqLevel)}/${ab.reqLevel}).`
+            : `${ab.desc} (recarga ${ab.cd / 1000}s)`;
+        card.innerHTML =
+            `<span class="charDot" style="background:${locked ? "#555" : "#b272d8"};box-shadow:0 0 14px ${locked ? "#333" : "#b272d8"}"></span>` +
+            `<span class="charName">${ab.name}${locked ? " 🔒" : ""}</span>` +
+            `<span class="charDesc">${info}</span>`;
+        if (!locked) card.onclick = () => { selectedSkill = i; saveSkill(); renderSkills(); };
+        skillGrid.appendChild(card);
+    });
+}
 
 function renderCollectibles() {
     collectGrid.innerHTML = "";
@@ -1901,6 +2109,15 @@ function showToast(text) {
     toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2600);
 }
 
+// Avisa quando o total de niveis subidos libera uma habilidade
+function checkSkillUnlock() {
+    for (let i = 0; i < ACTIVE_ABILITIES.length; i++) {
+        if (ACTIVE_ABILITIES[i].reqLevel === totalLevels) {
+            showToast(ACTIVE_ABILITIES[i].name + " liberada (equipe no menu)");
+        }
+    }
+}
+
 function startGame() {
     unlockAudio();
     activeUnlocks = new Set(unlocks);    // fixa o que vale nesta partida (liberacoes valem so na proxima)
@@ -1910,6 +2127,8 @@ function startGame() {
     playerColor = CHARS[selectedChar].color;
     charAbility = CHARS[selectedChar].ability;   // habilidade inicial do personagem
     upLevels["Habilidade"] = (charAbility === "none") ? 0 : 1;   // comeca no nivel 1
+    skill.cd = ACTIVE_ABILITIES[selectedSkill].cd;               // cooldown da habilidade ativavel equipada
+    skill.last = -skill.cd;
     updateWeaponBar();
     showScreen("none");
     document.body.classList.remove("menu-open");
@@ -1921,6 +2140,36 @@ function startGame() {
 function goToPlatform() { window.location.href = PLATAFORMA_URL; }
 
 // Finaliza a partida (vitoria ou derrota): atualiza recordes e mostra a tela certa.
+// Monta o relatorio de fim de partida (itens obtidos, conquistas e armas/itens liberados)
+function buildReportHTML(secsTotal) {
+    let picked = [];
+    Object.keys(upLevels).forEach(k => {
+        if (upLevels[k] >= 1) {
+            let label = (k === "Habilidade") ? (ABILITY_NAME[charAbility] || "Habilidade") : k;
+            picked.push(`${label} <b>Nv ${upLevels[k]}</b>`);
+        }
+    });
+    let newIds = [...unlocks].filter(id => !activeUnlocks.has(id));
+    let conquistas = [], liberados = [];
+    newIds.forEach(id => {
+        let a = ACHIEVEMENTS.find(x => x.id === id);
+        if (a) { conquistas.push(a.name); liberados.push(a.reward.replace(/^Libera (os|as|o|a) /, "")); }
+        else if (id === "ressonancia") { conquistas.push("Caçador de Boss"); liberados.push("Ressonância Estrutural"); }
+        else if (id === "reacao") { conquistas.push("Caçador de Boss"); liberados.push("Reação em Cadeia"); }
+    });
+    function sec(title, items, empty) {
+        let body = items.length ? items.map(i => `<span class="repTag">${i}</span>`).join("") : `<span class="repEmpty">${empty}</span>`;
+        return `<div class="repSec"><h3>${title}</h3><div class="repTags">${body}</div></div>`;
+    }
+    return `<div class="repHead">RELATÓRIO DA PARTIDA</div>` +
+        `<div class="repStats"><div><span>Tempo</span><b>${fmtTime(secsTotal)}</b></div>` +
+        `<div><span>Abates</span><b>${kills}</b></div>` +
+        `<div><span>Nível</span><b>${p.lv}</b></div></div>` +
+        sec("Itens obtidos", picked, "Nenhum") +
+        sec("Conquistas desbloqueadas", conquistas, "Nenhuma nesta partida") +
+        sec("Armas e personagens liberados", liberados, "Nenhum nesta partida");
+}
+
 function endRun(result) {
     let secsTotal = Math.floor(elapsedTime / 1000);
     let nrTime = secsTotal > records.time;
@@ -1931,20 +2180,24 @@ function endRun(result) {
     if (nrLevel) records.level = p.lv;
     saveRecords();
     saveLifetimeKills();         // atualiza abates vitalicios (idempotente: salva base + kills)
+    saveTotalLevels();           // persiste o total de niveis subidos (acumula entre partidas)
 
     let star = v => v ? " ★" : "";
     let stats = `Tempo: ${fmtTime(secsTotal)}${star(nrTime)} | Abates: ${kills}${star(nrKills)} | Nível: ${p.lv}${star(nrLevel)}`;
     let isRecord = nrTime || nrKills || nrLevel;
+    let report = buildReportHTML(secsTotal);
 
     if (result === "win") {
         sndWin();
         document.getElementById("winStats").textContent = stats;
         document.getElementById("winRecord").style.display = isRecord ? "block" : "none";
+        document.getElementById("reportWin").innerHTML = report;
         document.getElementById("winScreen").style.display = "flex";
     } else {
         sndOver();
         finalTimeText.textContent = stats;
         document.getElementById("overRecord").style.display = isRecord ? "block" : "none";
+        document.getElementById("reportOver").innerHTML = report;
         gameOverScreen.style.display = "flex";
     }
 }
@@ -1999,6 +2252,7 @@ function renderRecords() {
 
 document.getElementById("btnStart").onclick    = startGame;
 document.getElementById("btnChars").onclick    = () => { renderChars(); showScreen("chars"); };
+document.getElementById("btnSkills").onclick    = () => { renderSkills(); showScreen("skills"); };
 document.getElementById("btnCollect").onclick  = () => { renderCollectibles(); showScreen("collect"); };
 document.getElementById("btnPlatform").onclick = goToPlatform;
 document.querySelectorAll(".btnBack").forEach(b => b.onclick = () => showScreen("start"));
