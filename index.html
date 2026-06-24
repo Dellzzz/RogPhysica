@@ -965,8 +965,8 @@ function doImpulso(n) {
     sndGrav();
     let a = p.lastAngle;
     dashFx.x0 = p.x; dashFx.y0 = p.y;
-    p.x = Math.max(p.r, Math.min(world.w - p.r, p.x + Math.cos(a) * 120));
-    p.y = Math.max(p.r, Math.min(world.h - p.r, p.y + Math.sin(a) * 120));
+    p.x = Math.max(p.r, Math.min(world.w - p.r, p.x + Math.cos(a) * 200));
+    p.y = Math.max(p.r, Math.min(world.h - p.r, p.y + Math.sin(a) * 200));
     dashFx.x1 = p.x; dashFx.y1 = p.y; dashFx.life = 1;
     enemies.forEach(e => {
         let dx = e.x - p.x, dy = e.y - p.y, d = Math.hypot(dx, dy) || 1;
