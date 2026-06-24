@@ -52,6 +52,10 @@
         .barFill.xp::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent);transform:translateX(-100%);animation:shimmer 2.4s linear infinite}
         @keyframes shimmer{to{transform:translateX(260%)}}
         .barText{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;letter-spacing:.5px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.8);z-index:2}
+        #weaponBar{display:flex;gap:6px;margin-top:8px;align-items:center}
+        .slot{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;line-height:1;background:rgba(255,255,255,.04);border:1px solid rgba(127,233,255,.18)}
+        .slot.filled{background:rgba(57,213,255,.12);border-color:rgba(127,233,255,.5);box-shadow:0 0 10px rgba(57,213,255,.25)}
+        .slot.locked{opacity:.35;border-style:dashed}
 
         /* ============ Indicadores de arma automatica ============ */
         #autoWeps{position:fixed;right:22px;bottom:150px;display:flex;flex-direction:column;gap:9px;align-items:flex-end;z-index:3;pointer-events:none}
@@ -180,6 +184,7 @@
                 <span class="barLabel">XP</span>
                 <div class="barTrack xp"><div class="barFill xp" id="xpFill"></div><span class="barText" id="xpText">0/15</span></div>
             </div>
+            <div id="weaponBar"></div>
         </div>
     </div>
 
@@ -311,7 +316,8 @@ const c = document.getElementById("cv"),
       elXpFill = document.getElementById("xpFill"),
       elXpText = document.getElementById("xpText"),
       wepFar = document.getElementById("wepFar"),
-      wepPri = document.getElementById("wepPri");
+      wepPri = document.getElementById("wepPri"),
+      weaponBarEl = document.getElementById("weaponBar");
 
 // DPR limitado (telas 3x desenham ate 9x mais pixels) e zoom de camera (mais campo de visao).
 let DPR = 1, zoom = 1, viewW = innerWidth, viewH = innerHeight;
@@ -379,7 +385,9 @@ const ACHIEVEMENTS = [
     { id: "faraday",     name: "Blindagem",        cond: "Derrote 10.000 inimigos", reward: "Libera a Gaiola de Faraday",   check: s => s.kills >= 10000 },
     { id: "curie",       name: "Radioatividade",   cond: "Sobreviva 5 minutos",     reward: "Libera a personagem Curie",    check: s => s.time >= 300 },
     { id: "einstein",    name: "Relatividade",     cond: "Derrote 20.000 inimigos", reward: "Libera o personagem Einstein", check: s => s.kills >= 20000 },
-    { id: "joule",       name: "Termodinâmica",    cond: "Sobreviva 10 minutos",    reward: "Libera o personagem Joule",    check: s => s.time >= 600 }
+    { id: "joule",       name: "Termodinâmica",    cond: "Sobreviva 10 minutos",    reward: "Libera o personagem Joule",    check: s => s.time >= 600 },
+    { id: "slot4",       name: "Arsenal",          cond: "Sobreviva 5 minutos",     reward: "Libera o 4º espaço de arma",   check: s => s.time >= 300 },
+    { id: "slot5",       name: "Arsenal Completo", cond: "Sobreviva 10 minutos",    reward: "Libera o 5º espaço de arma",   check: s => s.time >= 600 }
 ];
 
 // Persistencia tolerante a falhas (localStorage pode nao funcionar offline)
@@ -431,6 +439,15 @@ const TESLA_STUN = 500;            // raio de Tesla paralisa o inimigo por 0,5s
 const REACAO_CD = 45000;           // recarga da Reacao em Cadeia (fixa, 45s)
 const REACAO_PRESERVE = [0.05, 0.10, 0.15, 0.20, 0.25];   // chance do item NAO ser destruido por nivel
 const REACAO_DEPTH = 9;            // particula original + 8 divisoes -> ate 256 alvos (teto)
+const CHAIN_STEP = 90;             // ms entre cada divisao (deixa a reacao mais lenta/visivel)
+
+// Espaco de armas: 3 slots (4o aos 5min, 5o aos 10min - valendo na rodada seguinte).
+const WEAPON_KEYS = ["Habilidade", "Lançadora de maçãs", "Prisma de Luz", "Gaiola de Faraday", "Ressonância Estrutural", "Reação em Cadeia"];
+const ABILITY_ICON = { tesla: "⚡️", newton: "🍎", curie: "🧪", joule: "🔥", einstein: "⌛️", none: "" };
+const WEAPON_ICON  = { "Lançadora de maçãs": "🍎", "Prisma de Luz": "🔥", "Gaiola de Faraday": "⚡️", "Ressonância Estrutural": "🔊", "Reação em Cadeia": "🫯" };
+function slotCount() { return 3 + (isActive("slot4") ? 1 : 0) + (isActive("slot5") ? 1 : 0); }
+function equippedWeaponKeys() { return WEAPON_KEYS.filter(k => upLevels[k] >= 1); }
+function weaponIconFor(key) { return key === "Habilidade" ? (ABILITY_ICON[charAbility] || "") : (WEAPON_ICON[key] || ""); }
 
 const faraday = { active: false, last: -999999, until: 0, r: 210, safe: new Set() };
 const prism   = { active: false, last: -999999, angle: 0, dir: 1, phase: 0, len: 470, bounce: false, hit: new Set() };
@@ -526,8 +543,8 @@ const BOSS_TIME = 270000;        // boss aparece aos 4:30 (antes da vitoria em 5
 
 // Ressonancia Estrutural (liberada ao derrotar o boss)
 const reso = { last: -99999, channeling: false, channelEnd: 0, waveActive: false, waveR: 0 };
-// Reacao em Cadeia (liberada ao derrotar o boss; alternativa a Ressonancia)
-const reacao = { last: -99999, links: [], life: 0 };
+// Reacao em Cadeia (liberada ao derrotar o boss; alternativa a Ressonancia). Propaga por etapas no tempo.
+const reacao = { last: -99999, links: [], active: false, frontier: [], hit: null, total: 0, gen: 0, preserve: 0, nextStep: 0 };
 let bossRewardPending = false;   // tela de escolha do premio do boss esta aberta
 
 // Nivel atual da habilidade (1..5; 0 = personagem sem habilidade)
@@ -538,7 +555,7 @@ function teslaParams() { let lv = abLv(); return { chainLen: lv <= 3 ? lv + 1 : 
 function curieParams() { let lv = abLv(); return { zoneR: lv <= 3 ? (70 + lv * 17) : 121, count: lv <= 3 ? 1 : (lv - 2) }; } // raio cresce lv1-3 ; pocoes 1/1/1/2/3
 function newtonParams(){ let lv = abLv(); return { count: Math.min(2 + lv, 4), explode: lv >= 4 ? 0.5 : (lv === 3 ? 0.2 : 0) }; } // macas 3/4/4/4/4 ; explosao 0/0/20%/50%/50%
 function jouleParams() { let lv = abLv(); return { R: lv <= 3 ? (95 + lv * 22) : 161, dmg: lv >= 5 ? 18 : (lv === 4 ? 13 : 9) }; }  // raio cresce lv1-3 ; dano 9/9/9/13/18
-function einsteinParams(){ let lv = abLv(); return { dur: 1500 + lv * 500, cd: 11000 - lv * 1000 }; }  // duracao 2/2.5/3/3.5/4s ; cd 10/9/8/7/6s
+function einsteinParams(){ let lv = abLv(); return { dur: 1000 + (lv - 1) * 750, cd: 20000 - (lv - 1) * 2500 }; }  // duracao 1/1.75/2.5/3.25/4s ; cd 20/17.5/15/12.5/10s
 
 // Nome e descricao das melhorias da habilidade (para as cartas de upgrade)
 const ABILITY_NAME = { tesla: "Raio Tesla", curie: "Pocao da Curie", newton: "Macas de Newton", joule: "Aura Joule", einstein: "Paralisia Temporal" };
@@ -547,8 +564,8 @@ function abilityUpDesc(toLv) {
         tesla:    { 2: "ricocheteia em 3", 3: "ricocheteia em 4", 4: "+1 raio", 5: "+1 raio (3 no total)" },
         curie:    { 2: "raio maior", 3: "raio ainda maior", 4: "+1 pocao", 5: "+1 pocao (3 no total)" },
         newton:   { 2: "+1 maca", 3: "macas explodem 20%", 4: "macas explodem 50%", 5: "turbilhao explosivo" },
-        joule:    { 2: "area maior", 3: "area ainda maior", 4: "+dano na area", 5: "+dano (maximo)" },
-        einstein: { 2: "+duracao e -recarga", 3: "+duracao e -recarga", 4: "+duracao e -recarga", 5: "4s parados, recarga 6s" }
+        joule:    { 2: "area maior", 3: "area ainda maior", 4: "+dano na area", 5: "+dano e cura 1/s na aura" },
+        einstein: { 2: "+duracao, -recarga", 3: "+duracao, -recarga", 4: "+duracao, -recarga", 5: "4s parados, recarga 10s" }
     };
     return (m[charAbility] && m[charAbility][toLv]) || "";
 }
@@ -655,11 +672,13 @@ function updateAcidZones(now) {
 
 // --- Joule: aura de calor (DoT ao redor do jogador) ---
 function jouleAura() {
-    let pr = jouleParams(), r2 = pr.R * pr.R;
+    let pr = jouleParams(), r2 = pr.R * pr.R, inside = 0;
     for (let i = enemies.length - 1; i >= 0; i--) {
         let e = enemies[i], dx = e.x - p.x, dy = e.y - p.y;
-        if (dx*dx + dy*dy <= r2) { applyDamage(e, pr.dmg); if (e.hp <= 0) killEnemy(e, i); }
+        if (dx*dx + dy*dy <= r2) { inside++; applyDamage(e, pr.dmg); if (e.hp <= 0) killEnemy(e, i); }
     }
+    // lv5: inimigos dentro da aura curam ~1 de vida por segundo (tick de 450ms)
+    if (abLv() >= 5 && inside > 0) p.hp = Math.min(p.maxHp, p.hp + 0.45);
 }
 
 // --- Ressonancia Estrutural (liberada ao derrotar o boss) ---
@@ -688,54 +707,62 @@ function updateReso(now, dt) {
 }
 
 // --- Reacao em Cadeia (liberada ao derrotar o boss) ---
-// Dispara uma particula; cada inimigo atingido divide em duas, ate 8 vezes (256 alvos).
-// Inimigos atingidos sao destruidos; itens tambem, salvo a chance de preservacao por nivel. Chefe imune.
+// Dispara uma particula que se divide a cada inimigo atingido, ate 8 vezes (256 alvos).
+// A propagacao acontece ao longo do tempo (uma divisao a cada CHAIN_STEP ms). Chefe imune.
 function fireReacao() {
     let lv = upLevels["Reação em Cadeia"];
-    let preserve = REACAO_PRESERVE[lv - 1];
-    let hit = new Set(), links = [];
-    let frontier = [{ x: p.x, y: p.y }];
-    let range2 = 460 * 460, total = 0;
-    for (let gen = 0; gen < REACAO_DEPTH && total < 256; gen++) {
-        let next = [];
-        for (let s = 0; s < frontier.length; s++) {
-            if (total >= 256) break;
-            let src = frontier[s], best = null, bestD = range2;
-            for (let k = 0; k < enemies.length; k++) {
-                let e = enemies[k];
-                if (e.isBoss || hit.has(e)) continue;       // chefe imune; nao repete alvo
-                let dx = e.x - src.x, dy = e.y - src.y, d2 = dx*dx + dy*dy;
-                if (d2 < bestD) { bestD = d2; best = e; }
-            }
-            if (best) {
-                hit.add(best); total++;
-                links.push({ x1: src.x, y1: src.y, x2: best.x, y2: best.y });
-                next.push({ x: best.x, y: best.y });        // divide em duas
-                next.push({ x: best.x, y: best.y });
-            }
-        }
-        frontier = next;
-        if (!frontier.length) break;
-    }
-    // Destroi os atingidos (drops so caem se a chance de preservacao acertar)
-    for (let i = enemies.length - 1; i >= 0; i--) {
-        let e = enemies[i];
-        if (!hit.has(e)) continue;
-        if (Math.random() < preserve) {                     // item preservado
-            if (e.chest) chests.push({ x: e.x, y: e.y, r: 16, grav: false });
-            else for (let d = 0; d < e.drops; d++) drops.push({ x: e.x + Math.random()*20 - 10, y: e.y + Math.random()*20 - 10, grav: false });
-        }
-        explosions.push({ x: e.x, y: e.y, r: 26, life: 1 });
-        enemies.splice(i, 1); kills++; spawnEnemy();
-    }
-    reacao.links = links; reacao.life = 320;
+    reacao.preserve = REACAO_PRESERVE[lv - 1];
+    reacao.hit = new Set();
+    reacao.frontier = [{ x: p.x, y: p.y }];
+    reacao.total = 0;
+    reacao.gen = 0;
+    reacao.active = true;
+    reacao.nextStep = elapsedTime;     // processa a 1a geracao no proximo passo
     sndReacao();
+}
+function stepReacao() {
+    let range2 = 460 * 460, next = [];
+    for (let s = 0; s < reacao.frontier.length; s++) {
+        if (reacao.total >= 256) break;
+        let src = reacao.frontier[s], best = null, bestD = range2;
+        for (let k = 0; k < enemies.length; k++) {
+            let e = enemies[k];
+            if (e.isBoss || reacao.hit.has(e)) continue;       // chefe imune; nao repete alvo
+            let dx = e.x - src.x, dy = e.y - src.y, d2 = dx*dx + dy*dy;
+            if (d2 < bestD) { bestD = d2; best = e; }
+        }
+        if (best) {
+            reacao.hit.add(best); reacao.total++;
+            reacao.links.push({ x1: src.x, y1: src.y, x2: best.x, y2: best.y, life: 1 });
+            if (Math.random() < reacao.preserve) {             // item preservado pela chance do nivel
+                if (best.chest) chests.push({ x: best.x, y: best.y, r: 16, grav: false });
+                else for (let d = 0; d < best.drops; d++) drops.push({ x: best.x + Math.random()*20 - 10, y: best.y + Math.random()*20 - 10, grav: false });
+            }
+            explosions.push({ x: best.x, y: best.y, r: 26, life: 1 });
+            let ix = enemies.indexOf(best);
+            if (ix >= 0) { enemies.splice(ix, 1); kills++; spawnEnemy(); }
+            next.push({ x: best.x, y: best.y });               // divide em duas
+            next.push({ x: best.x, y: best.y });
+        }
+    }
+    reacao.frontier = next;
+    reacao.gen++;
+    if (reacao.gen >= REACAO_DEPTH || reacao.total >= 256 || !next.length) reacao.active = false;
 }
 function updateReacao(now, dt) {
     let lv = upLevels["Reação em Cadeia"];
     if (lv <= 0) return;
-    if (enemies.some(e => !e.isBoss) && now - reacao.last >= REACAO_CD) { reacao.last = now; fireReacao(); }
-    if (reacao.life > 0) reacao.life -= dt;
+    if (!reacao.active && enemies.some(e => !e.isBoss) && now - reacao.last >= REACAO_CD) {
+        reacao.last = now; fireReacao();
+    }
+    if (reacao.active && now >= reacao.nextStep) {             // uma divisao por passo (propagacao lenta)
+        stepReacao();
+        reacao.nextStep = now + CHAIN_STEP;
+    }
+    for (let i = reacao.links.length - 1; i >= 0; i--) {       // fade dos links da arvore
+        reacao.links[i].life -= dt / 420;
+        if (reacao.links[i].life <= 0) reacao.links.splice(i, 1);
+    }
 }
 
 // Atualiza a habilidade do personagem ativo
@@ -936,6 +963,8 @@ function showLevel() {
     level.style.display = "flex";
     opts.innerHTML = "";
     
+    let equippedCount = equippedWeaponKeys().length;
+    let slots = slotCount();
     let available = Object.keys(upLevels).filter(u => {
         if(upLevels[u] >= 5) return false;
         if(u === "Velocidade das orbes" && targetOrbs() < 5) return false;
@@ -946,6 +975,11 @@ function showLevel() {
         if(u === "Gaiola de Faraday" && !isActive("faraday")) return false;
         if(u === "Ressonância Estrutural" && !isActive("ressonancia")) return false;
         if(u === "Reação em Cadeia" && !isActive("reacao")) return false;
+        // Ressonancia e Reacao sao mutuamente exclusivas (uma equipada bloqueia a outra)
+        if(u === "Reação em Cadeia" && upLevels["Ressonância Estrutural"] > 0) return false;
+        if(u === "Ressonância Estrutural" && upLevels["Reação em Cadeia"] > 0) return false;
+        // Limite de espaco de armas: uma arma nova so aparece se houver slot livre
+        if(WEAPON_KEYS.includes(u) && upLevels[u] === 0 && equippedCount >= slots) return false;
         return true;
     });
 
@@ -994,6 +1028,7 @@ function showLevel() {
             if(u == "Velocidade das orbes") p.orbSpeed *= 1.5; 
             if(u == "Chance de crítico") p.critChance += 0.05;
             
+            updateWeaponBar();
             paused = false;
             level.style.display = "none";
         };
@@ -1396,6 +1431,19 @@ function updateWep(el, lv, last, cdArr, now, active) {
     el.classList.toggle("ready", ready && !active);
 }
 
+// Mostra os espacos de arma na HUD: icones equipados, slots vazios e slots bloqueados (ate 5)
+function updateWeaponBar() {
+    if (!weaponBarEl) return;
+    let icons = equippedWeaponKeys().map(weaponIconFor).filter(Boolean);
+    let slots = slotCount(), html = "";
+    for (let i = 0; i < 5; i++) {
+        if (i >= slots) html += `<div class="slot locked"></div>`;
+        else if (i < icons.length) html += `<div class="slot filled">${icons[i]}</div>`;
+        else html += `<div class="slot"></div>`;
+    }
+    weaponBarEl.innerHTML = html;
+}
+
 function bar(x, y, w, h, p, f, b) { ctx.fillStyle = b; ctx.fillRect(x,y,w,h); ctx.fillStyle = f; ctx.fillRect(x,y,w*p,h); }
 
 // Desenha o prisma triangular girando, com arestas em arco-iris
@@ -1549,13 +1597,12 @@ function draw() {
         });
     }
 
-    // Reacao em Cadeia (particula que se divide em arvore)
-    if (reacao.life > 0 && reacao.links.length) {
-        let a = Math.max(0, Math.min(1, reacao.life / 320));
+    // Reacao em Cadeia (arvore de particulas que se divide; cada link some no seu tempo)
+    if (reacao.links.length) {
+        ctx.lineWidth = 2.4; ctx.lineCap = "round";
         for (let i = 0; i < reacao.links.length; i++) {
-            let L = reacao.links[i];
+            let L = reacao.links[i], a = Math.max(0, Math.min(1, L.life));
             ctx.strokeStyle = "rgba(120,230,255," + a.toFixed(2) + ")";
-            ctx.lineWidth = 2.4; ctx.lineCap = "round";
             ctx.beginPath(); ctx.moveTo(L.x1, L.y1); ctx.lineTo(L.x2, L.y2); ctx.stroke();
             ctx.fillStyle = "rgba(255,255,255," + a.toFixed(2) + ")";
             ctx.beginPath(); ctx.arc(L.x2, L.y2, 3, 0, 6.28); ctx.fill();
@@ -1843,6 +1890,7 @@ function startGame() {
     playerColor = CHARS[selectedChar].color;
     charAbility = CHARS[selectedChar].ability;   // habilidade inicial do personagem
     upLevels["Habilidade"] = (charAbility === "none") ? 0 : 1;   // comeca no nivel 1
+    updateWeaponBar();
     showScreen("none");
     document.body.classList.remove("menu-open");
     gameStarted = true;
