@@ -382,14 +382,15 @@ rs();
 addEventListener("resize", rs);
 addEventListener("orientationchange", rs);
 
-const world = {w:8000, h:8000, f:.1}, cam = {x:0, y:0, s:.12};
+const world = {w:4000, h:4000, f:.1}, cam = {x:0, y:0, s:.12};
+const PLAYER_DRAW_SCALE = 1.5;   // escala VISUAL do personagem (sem mexer no hitbox p.r): fica ~2 tiles, maior que a mesa
 let paused = true;          // comeca pausado, no menu inicial
 let gameStarted = false;
 
 // URL da sua plataforma (ajuste aqui). Usada pelo botao "Voltar para plataforma".
 const PLATAFORMA_URL = "index.html";
 
-const p = {x:4000, y:4000, vx:0, vy:0, r:15, spd:.175, hp:100, maxHp:100, lv:1, xp:0, next:18, pickup:25, orbXp:5, orbSpeed:.02, extraOrbs:0, lastAngle: 0, face: 1, moving: false, dmgMult: 1.0, xpMult: 1.0, critChance: 0.0, dead: false};
+const p = {x:2000, y:2000, vx:0, vy:0, r:15, spd:.175, hp:100, maxHp:100, lv:1, xp:0, next:18, pickup:25, orbXp:5, orbSpeed:.02, extraOrbs:0, lastAngle: 0, face: 1, moving: false, dmgMult: 1.0, xpMult: 1.0, critChance: 0.0, dead: false};
 cam.x = p.x - viewW / 2;   // ja centraliza no jogador para o fundo do menu
 cam.y = p.y - viewH / 2;
 
@@ -501,12 +502,12 @@ const upLevels = {
 
 // Tempos de recarga (ms) por nível 1..5
 const FARADAY_CD = [60000, 55000, 50000, 45000, 40000];
-const PRISM_CD   = [10000, 8000, 6000, 4000, 3000];
-const RESO_CD    = [50000, 46000, 42000, 38000, 34000];
+const PRISM_CD   = [10000, 8000, 6000, 4000, 4000];
+const RESO_CD    = [40000, 36000, 32000, 28000, 24000];
 
-const GAME_SPEED = 0.9;            // velocidade geral do jogo (1.5x apenas no movimento/acao)
+const GAME_SPEED = 1.5;            // velocidade geral do jogo (1.5x apenas no movimento/acao)
 const ENEMY_MAX_LIFE = 120000;     // inimigo some apos 2 min no mapa
-const RESO_RADIUS = 540;           // alcance da Ressonancia (um pouco maior que a Gaiola, r=210)
+const RESO_RADIUS = 240;           // alcance da Ressonancia (um pouco maior que a Gaiola, r=210)
 const TESLA_STUN = 500;            // raio de Tesla paralisa o inimigo por 0,5s
 const REACAO_CD = 45000;           // recarga da Reacao em Cadeia (fixa, 45s)
 const REACAO_PRESERVE = [0.05, 0.10, 0.15, 0.20, 0.25];   // chance do item NAO ser destruido por nivel
@@ -902,7 +903,7 @@ const CAT_ROW = { alive: 0, dead: 1 };       // linhas: vivo / fantasmagorico
 const CAT_COL = { parado: 0, andando: 1, dano: 2, morte: 3 };
 const CAT_SIZE = 80;                         // o gato e desenhado com ~80px de largura
 const CAT_TIME = 600000;                     // aparece aos 10:00
-const CAT_HP = 2500;
+const CAT_HP = 1500;
 const CAT_ALIVE_MS = 5000;                   // tempo no estado VIVO (pode ser atingido)
 const CAT_DEAD_MS = 3000;                    // tempo no estado MORTO (intangivel/invulneravel)
 const CAT_LASER_MS = 1500;                   // intervalo entre disparos
@@ -1085,9 +1086,9 @@ function doImpulso(n) {
     let a = p.lastAngle;
     dashFx.x0 = p.x; dashFx.y0 = p.y;
     let stuckD = solidForPlayer(p.x, p.y);
-    let dnx = Math.max(p.r, Math.min(world.w - p.r, p.x + Math.cos(a) * 120));
+    let dnx = Math.max(p.r, Math.min(world.w - p.r, p.x + Math.cos(a) * 65));
     if (stuckD || !solidForPlayer(dnx, p.y)) p.x = dnx;
-    let dny = Math.max(p.r, Math.min(world.h - p.r, p.y + Math.sin(a) * 120));
+    let dny = Math.max(p.r, Math.min(world.h - p.r, p.y + Math.sin(a) * 65));
     if (stuckD || !solidForPlayer(p.x, dny)) p.y = dny;
     dashFx.x1 = p.x; dashFx.y1 = p.y; dashFx.life = 1;
     enemies.forEach(e => {
@@ -2322,13 +2323,13 @@ function draw() {
     ctx.globalAlpha = frozenNow ? 0.55 : 1;       // intangivel durante a paralisia: semitransparente
     let spRow = SPRITE_ROW[charAbility];
     if (spRow !== undefined && spritesReady) {
-        // Sprite pixel-art animado. Escala r/16: a faixa de 32px abaixo da cintura cobre a colisao.
-        let s = p.r / 16;
+        // Sprite pixel-art animado. Visual escalado (PLAYER_DRAW_SCALE) com o PE preso na base do hitbox (p.r).
+        let s = (p.r / 16) * PLAYER_DRAW_SCALE;
         let dw = SPR_FW * s, dh = SPR_FH * s;
         let frame = p.moving ? (1 + (Math.floor(performance.now() / 170) % 2)) : 0;   // parado=0; andando alterna 1<->2
         let bob = p.moving ? 0 : Math.sin(performance.now() / 520) * (p.r * 0.03);    // leve respiracao parado
         let ax = p.x - dw / 2;
-        let ay = p.y - (SPR_FH - 16) * s + bob;   // ancora 16px acima do pe -> colisao no terco inferior
+        let ay = (p.y + p.r) - dh + bob;   // pe na base do hitbox; o corpo cresce para cima
         let smooth = ctx.imageSmoothingEnabled;
         ctx.imageSmoothingEnabled = false;        // mantem os pixels nitidos
         if (p.face < 0) { ctx.translate(p.x, 0); ctx.scale(-1, 1); ctx.translate(-p.x, 0); }   // espelha
@@ -2361,7 +2362,7 @@ function draw() {
 
     // Barra de vida acima do sprite do personagem (acima da cabeca)
     let pSpRow = SPRITE_ROW[charAbility];
-    let pBarY = (pSpRow !== undefined && spritesReady) ? p.y - (SPR_FH - 16) * (p.r / 16) - 9 : p.y - p.r - 12;
+    let pBarY = (pSpRow !== undefined && spritesReady) ? (p.y + p.r) - SPR_FH * (p.r / 16) * PLAYER_DRAW_SCALE - 9 : p.y - p.r - 12;
     bar(p.x - 20, pBarY, 40, 5, p.hp / p.maxHp, "#0f0", "#400");
     
     // Desenha indicadores de dano (fonte compensada pelo zoom para manter a leitura)
